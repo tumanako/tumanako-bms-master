@@ -65,8 +65,6 @@ int main()
     int res;
     struct termios oldtio,newtio;
     char buf[255];
-    printf("%x %x %x\n", 0x56, 0x78, 0x56 << 8 | 0x78);
-	return;
 
 	if( (hDevice = openUSBConnection(LJ_ID)) == NULL) {
 		fprintf(stderr, "no labjack?\n");
