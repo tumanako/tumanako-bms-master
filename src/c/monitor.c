@@ -9,7 +9,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include "u3.h"
-
+#include "../../../slave/src/c/evd5.h"
 
 #define BAUDRATE B9600
 #define MODEMDEVICE "/dev/ttyS0"
@@ -42,11 +42,7 @@ double getChargeCurrent();
 
 int fd;
 
-struct cell_t {
-	int voltage;
-	int current;
-	int minCurrent;
-} cells[CELL_COUNT];
+struct evd5_status_t cells[CELL_COUNT];
 
 //int cellIDs[CELL_COUNT] = { 0x3030, 0x3032, 0x3033 };
 //int cellIDs[CELL_COUNT] = { 0x3035, 0x3038, 0x3039 };
@@ -138,11 +134,11 @@ int main()
 				return -1;
 			}
 			char *endptr;
-			cells[i].voltage = strtol(buf + 3, &endptr, 10);
+			cells[i].vCell = strtol(buf + 3, &endptr, 10);
 			if (endptr != buf + 8) {
-				cells[i].voltage = -1;
+				cells[i].vCell = -1;
 			}
-			printf("%5d ", cells[i].voltage);
+			printf("%5d ", cells[i].vCell);
 			fflush(NULL);
  			sendCommand(cellID, seq++, 'i');
 			res = readEnough(fd, buf, 10);
@@ -150,11 +146,11 @@ int main()
 				printf("not enough characters? %d %s\n", res, buf);
 				return -1;
 			}
-			cells[i].current = strtol(buf + 3, &endptr, 10);
+			cells[i].iShunt = strtol(buf + 3, &endptr, 10);
 			if (endptr != buf + 8) {
-				cells[i].current = -1;
+				cells[i].iShunt = -1;
 			}
-			printf("%5d ", cells[i].current);
+			printf("%5d ", cells[i].iShunt);
 			fflush(NULL);
 		}
 		printf("\n");
@@ -174,7 +170,7 @@ int main()
 
 void turnUpHighCells() {
 	for (int i = 0; i < CELL_COUNT; i++) {
-		if (cells[i].voltage > CHARGER_ON_VOLTAGE) {
+		if (cells[i].vCell > CHARGER_ON_VOLTAGE) {
 			setMinCurrent(i, 500);
 		}
 	}
@@ -182,7 +178,7 @@ void turnUpHighCells() {
 
 void turnDownCells() {
 	for (int i = 0; i < CELL_COUNT; i++) {
-		if (cells[i].voltage > CHARGER_ON_VOLTAGE - 10 && !chargerState) {
+		if (cells[i].vCell > CHARGER_ON_VOLTAGE - 10 && !chargerState) {
 			setMinCurrent(i, 500);
 		} else {
 			setMinCurrent(i, 0);
@@ -216,8 +212,8 @@ void setMinCurrent(int cellIndex, short minCurrent) {
 int minVoltage() {
 	int result = 999999;
 	for (int i = 0; i < CELL_COUNT; i++) {
-		if (cells[i].voltage < result) {
-			result = cells[i].voltage;
+		if (cells[i].vCell < result) {
+			result = cells[i].vCell;
 		}
 	}
 	return result;
@@ -226,8 +222,8 @@ int minVoltage() {
 int maxVoltage() {
 	int result = 0;
 	for (int i = 0; i < CELL_COUNT; i++) {
-		if (cells[i].voltage > result) {
-			result = cells[i].voltage;
+		if (cells[i].vCell > result) {
+			result = cells[i].vCell;
 		}
 	}
 	return result;
@@ -236,7 +232,7 @@ int maxVoltage() {
 int totalVoltage() {
 	int result = 0;
 	for (int i = 0; i < CELL_COUNT; i++) {
-		result += cells[i].voltage;
+		result += cells[i].vCell;
 	}
 	return result;
 }
