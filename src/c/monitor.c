@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include "u3.h"
 #include "../../../slave/src/c/evd5.h"
@@ -27,6 +28,7 @@
 #define CHARGE_CURRENT_CHANNEL 4
 
 void sendCommand(int address, char sequenceNumber, char command);
+void getCellState(int cellIndex);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, char *buf, int length);
 int maxVoltage();
@@ -125,32 +127,8 @@ int main()
 		printf("%d ", (int) t);
 		printf("%lf ", getChargeCurrent());
 		for (int i = 0; i < CELL_COUNT; i++) {
-			int cellID = cellIDs[i];
-			sendCommand(cellID, seq++, 'c');
-			res = readEnough(fd, buf, 10);
-			if (res != 10) {
-				buf[res] = 0;
-				printf("not enough characters? %d %s\n", res, buf);
-				return -1;
-			}
-			char *endptr;
-			cells[i].vCell = strtol(buf + 3, &endptr, 10);
-			if (endptr != buf + 8) {
-				cells[i].vCell = -1;
-			}
-			printf("%5d ", cells[i].vCell);
-			fflush(NULL);
- 			sendCommand(cellID, seq++, 'i');
-			res = readEnough(fd, buf, 10);
-			if (res != 10) {
-				printf("not enough characters? %d %s\n", res, buf);
-				return -1;
-			}
-			cells[i].iShunt = strtol(buf + 3, &endptr, 10);
-			if (endptr != buf + 8) {
-				cells[i].iShunt = -1;
-			}
-			printf("%5d ", cells[i].iShunt);
+			getCellState(i);
+			printf("%5d %5d ", cells[i].vCell, cells[i].iShunt);
 			fflush(NULL);
 		}
 		printf("\n");
@@ -166,6 +144,27 @@ int main()
 		fflush(NULL);
 	}
     	tcsetattr(fd,TCSANOW,&oldtio);
+}
+
+void getCellState(int cellIndex) {
+	char buf[255];
+	int actualLength;
+	struct evd5_status_t *status = &cells[cellIndex];
+	sendCommand(cellIDs[cellIndex], '0', '/');
+	actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
+	if (actualLength != EVD5_STATUS_LENGTH) {
+		int i;
+		printf("read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellIndex);
+		for (i = 0; i < actualLength; i++) {
+			printf("%d %x\n", i, (unsigned char) buf[i]);
+		}
+		actualLength = readEnough(fd, buf, 255);
+		printf("read %d more\n", actualLength);
+		return;
+	}
+	
+	memcpy(status, buf, sizeof(struct evd5_status_t));
+	//printf("Vc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic);
 }
 
 void turnUpHighCells() {
