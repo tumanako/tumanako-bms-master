@@ -17,7 +17,7 @@
 #define FALSE 0
 #define TRUE 1
 
-#define CELL_COUNT 3
+#define CELL_COUNT 10
 #define CHARGER_RELAY_PORT 7
 #define CHARGER_ON_VOLTAGE 3550
 #define CHARGER_OFF_VOLTAGE 3650
@@ -48,9 +48,9 @@ struct cell_t {
 	int minCurrent;
 } cells[CELL_COUNT];
 
-int cellIDs[CELL_COUNT] = { 0x3030, 0x3032, 0x3033 };
+//int cellIDs[CELL_COUNT] = { 0x3030, 0x3032, 0x3033 };
 //int cellIDs[CELL_COUNT] = { 0x3035, 0x3038, 0x3039 };
-//int cellIDs[CELL_COUNT] = { 0x3030, 0x3032, 0x3033, 0x3034, 0x3035, 0x3038, 0x3039 };
+int cellIDs[10] = { 0x3030, 0x3031, 0x3032, 0x3033, 0x3034, 0x3035, 0x3036, 0x3037, 0x3038, 0x3039 };
 
 char chargerState = 0;
 
