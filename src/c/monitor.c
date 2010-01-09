@@ -175,10 +175,12 @@ void getCellState(int cellIndex) {
 		return;
 	}
 	memcpy(status, buf, EVD5_STATUS_LENGTH);
-	if (status[cellIndex].cellAddress != cellIDs[cellIndex]) {
-		printf("\nSent message to %x but recieved response from %x, %x\n", status[cellIndex].cellAddress, cellIDs[cellIndex], status[cellIndex]);
-		int i;
-		for (i = 0; i < actualLength; i++) {
+	char *sc = (char *) status;
+	sc[0] = buf[1];
+	sc[1] = buf[0];
+	if (status->cellAddress != cellIDs[cellIndex]) {
+		printf("\nSent message to %x but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
+		for (int i = 0; i < actualLength; i++) {
                         printf("%d %x\n", i, (unsigned char) buf[i]);
                 }
 		exit(1);
