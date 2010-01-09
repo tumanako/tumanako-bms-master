@@ -146,24 +146,43 @@ int main()
     	tcsetattr(fd,TCSANOW,&oldtio);
 }
 
+unsigned char sequenceNumber = 0;
+
 void getCellState(int cellIndex) {
 	char buf[255];
+	unsigned char sentSequenceNumber, recSequenceNumber;
 	int actualLength;
 	struct evd5_status_t *status = &cells[cellIndex];
-	sendCommand(cellIDs[cellIndex], '0', '/');
+	sentSequenceNumber = sequenceNumber++;
+	sendCommand(cellIDs[cellIndex], sentSequenceNumber, '/');
 	actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
-	if (actualLength != EVD5_STATUS_LENGTH) {
+	if (actualLength > 12) {
+		recSequenceNumber = (unsigned char) buf[12];
+	}
+	if (actualLength != EVD5_STATUS_LENGTH || sentSequenceNumber != recSequenceNumber) {
 		int i;
-		printf("read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellIndex);
+		printf("read %d, expected %d from cell %d sent seq %x, rec seq %x\n", actualLength, EVD5_STATUS_LENGTH, cellIndex, 
+				sentSequenceNumber, recSequenceNumber);
 		for (i = 0; i < actualLength; i++) {
 			printf("%d %x\n", i, (unsigned char) buf[i]);
 		}
 		actualLength = readEnough(fd, buf, 255);
 		printf("read %d more\n", actualLength);
+		for (i = 0; i < actualLength; i++) {
+			printf("%d %x\n", i, (unsigned char) buf[i]);
+		}
+		exit(1);
 		return;
 	}
-	
-	memcpy(status, buf, sizeof(struct evd5_status_t));
+	memcpy(status, buf, EVD5_STATUS_LENGTH);
+	if (status[cellIndex].cellAddress != cellIDs[cellIndex]) {
+		printf("\nSent message to %x but recieved response from %x, %x\n", status[cellIndex].cellAddress, cellIDs[cellIndex], status[cellIndex]);
+		int i;
+		for (i = 0; i < actualLength; i++) {
+                        printf("%d %x\n", i, (unsigned char) buf[i]);
+                }
+		exit(1);
+	}
 	//printf("Vc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic);
 }
 
