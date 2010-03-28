@@ -9,8 +9,8 @@
 #include <strings.h>
 #include <string.h>
 #include <unistd.h>
-#include "u3.h"
 #include "../../../slave/src/c/evd5.h"
+#include "chargercontrol.h"
 
 #define BAUDRATE B9600
 #define MODEMDEVICE "/dev/ttyS0"
@@ -38,12 +38,9 @@ int maxVoltage();
 int minVoltage();
 int avgVoltage();
 int totalVoltage();
-int setWatchdog(HANDLE hDevice);
 void turnUpHighCells();
 void turnDownCells();
 void setMinCurrent(int cellIndex, short minCurrent);
-double getReading(int channel);
-double getChargeCurrent();
 
 int fd;
 
@@ -55,35 +52,16 @@ struct evd5_status_t cells[CELL_COUNT];
 int cellIDs[CELL_COUNT];
 
 char chargerState = 0;
-
-HANDLE hDevice;
-double chargeCurrentZero;
-u3CalibrationInfo caliInfo;
-HANDLE hDevice;
-long DAC1Enable;
-
 int main()
 {
     int res;
     struct termios oldtio,newtio;
     char buf[255];
 
-	if( (hDevice = openUSBConnection(LJ_ID)) == NULL) {
-		fprintf(stderr, "no labjack?\n");
-    		return 1;
+	if (chargercontrol_init()) {
+		return 1;
 	}
-	
-	//Get calibration information from UE9
-	if(getCalibrationInfo(hDevice, &caliInfo) < 0)
-		return(1);
 
-	// turn off charger
-	eDO(hDevice, 1, CHARGER_RELAY_PORT, 0);
-	setWatchdog(hDevice);
-
-	chargeCurrentZero = getReading(4);
-	fprintf(stderr, "voltage at zero current is %lf\n", chargeCurrentZero);
-	
     fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY );
     if (fd <0) {
         perror(MODEMDEVICE);
@@ -131,7 +109,7 @@ int main()
 		}
 		last = t;
 		printf("%d ", (int) t);
-		printf("%lf ", getChargeCurrent());
+		printf("%lf ", chargercontrol_getChargeCurrent());
 		for (int i = 0; i < CELL_COUNT; i++) {
 			sleep(1);
 			getCellState(i);
@@ -140,10 +118,10 @@ int main()
 		}
 		printf("\n");
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
-			eDO(hDevice, 1, CHARGER_RELAY_PORT, 0);
+			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
  		} if (maxVoltage() < CHARGER_ON_VOLTAGE || chargerState) {
-			eDO(hDevice, 1, CHARGER_RELAY_PORT, 1);
+			chargercontrol_setCharger(TRUE);
 			chargerState = 1;
 		}
 		fprintf(stderr, "%d %d %d %d %s\n", minVoltage(), avgVoltage(), maxVoltage(), totalVoltage(), chargerState ? "on" : "off");
@@ -325,92 +303,6 @@ int readEnough(int fd, char *buf, int length) {
 		}
 	}
 	return actual;
-}
-
-int setWatchdog(HANDLE hDevice) {
-  
-  uint8 sendBuff[26];
-  uint8 recBuff[38];
-  uint16 checksumTotal;
-  int sendChars, recChars;
-
-  //Setting all bytes to zero since we only want to read back the U3
-  //configuration settings
-  for(int i = 0; i < 26; i++)
-    sendBuff[i] = 0;
-
-  sendBuff[1] = (uint8)(0xF8);  //Command byte
-  sendBuff[2] = (uint8)(0x05);  //Number of data words
-  sendBuff[3] = (uint8)(0x09);  //Extended command number
-  sendBuff[6] = 0x01;           // write?
-//  sendBuff[7] = 0x18;           // set DO and reset
-  sendBuff[7] = 0x10;           // reset
-  sendBuff[8] = 0x14;           // timeout MSB
-  sendBuff[9] = 0x00;           // timeout LSB
-  sendBuff[10] = CHARGER_RELAY_PORT;          // set DO 4 to low
-  sendBuff[0] = extendedChecksum8(sendBuff);
-  extendedChecksum(sendBuff, 16);
-
-  //Sending command to U3
-  if( (sendChars = LJUSB_BulkWrite(hDevice, U3_PIPE_EP1_OUT, sendBuff, 16)) < 16)
-  {
-    if(sendChars == 0)
-      printf("ConfigU3 error : write failed\n");
-    else
-      printf("ConfigU3 error : did not write all of the buffer\n");
-    return -1;
-  }
-
-  //Reading response from U3
-  if( (recChars = LJUSB_BulkRead(hDevice, U3_PIPE_EP2_IN, recBuff, 16)) < 16)
-  {
-    if(recChars == 0)
-      printf("ConfigU3 error : read failed\n");
-    else
-      printf("ConfigU3 error : did not read all of the buffer\n");
-    return -1;
-  }
-  
-  checksumTotal = extendedChecksum16(recBuff, 16);
-  if( (uint8)((checksumTotal / 256) & 0xff) != recBuff[5])
-  {
-    printf("ConfigU3 error : read buffer has bad checksum16(MSB)\n");
-    return -1;
-  }
-  if( (uint8)(checksumTotal & 0xff) != recBuff[4])
-  {
-    printf("ConfigU3 error : read buffer has bad checksum16(LBS)\n");
-    return -1;
-  }
- 
-  if( recBuff[6] != 0)
-  {
-    printf("ConfigU3 error : read buffer received errorcode %d\n", recBuff[6]);
-    return -1;
-  }
-  /*for (int i = 0; i < 16; i++) {
-     printf("%x ", recBuff[i]);
-  }
-  printf("\n"); */
-  return 0;
-}
-
-double getReading(int channel) {
-	double value = 0;
-	for (int j = 0; j < CHARGE_CURRENT_OVERSAMPLING; j++) {
-		double singleValue;
-		if((eAIN(hDevice, &caliInfo, 1, &DAC1Enable, channel, 31, &singleValue, 0, 0, 0, 0, 0, 0)) != 0)
-			exit(1);
-		value += singleValue;
-	}
-	return value / CHARGE_CURRENT_OVERSAMPLING;
-}
-
-double getChargeCurrent() {
-	double value = getReading(CHARGE_CURRENT_CHANNEL);
-	double result = (chargeCurrentZero - value) / 0.020 * (3 / 2.7);
-	//printf("%lf %lf %lf\n", result, value, zero);
-	return result;
 }
 
 void initCellIDArray() {
