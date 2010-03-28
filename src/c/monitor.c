@@ -28,6 +28,7 @@
 #define CHARGE_CURRENT_OVERSAMPLING 5
 #define CHARGE_CURRENT_CHANNEL 4
 
+void initCellIDArray();
 void sendCommand(int address, char sequenceNumber, char command);
 void getCellState(int cellIndex);
 void writeSlowly(int fd, char *s, int length);
@@ -49,7 +50,8 @@ struct evd5_status_t cells[CELL_COUNT];
 
 //int cellIDs[CELL_COUNT] = { 0x3030, 0x3032, 0x3033 };
 //int cellIDs[CELL_COUNT] = { 0x3035, 0x3038, 0x3039 };
-int cellIDs[10] = { 0x3030, 0x3031, 0x3032, 0x3033, 0x3034, 0x3035, 0x3036, 0x3037, 0x3038, 0x3039 };
+//int cellIDs[CELL_COUNT] = { 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 };
+int cellIDs[CELL_COUNT];
 
 char chargerState = 0;
 
@@ -102,6 +104,8 @@ int main()
 
     tcflush(fd, TCIFLUSH);
     tcsetattr(fd,TCSANOW,&newtio);
+
+    initCellIDArray();
 
 	char seq = '0';
 
@@ -402,4 +406,10 @@ double getChargeCurrent() {
 	double result = (chargeCurrentZero - value) / 0.020 * (3 / 2.7);
 	//printf("%lf %lf %lf\n", result, value, zero);
 	return result;
+}
+
+void initCellIDArray() {
+	for (int i = 0; i < CELL_COUNT; i++) {
+		cellIDs[i] = CELL_ID_BASE + i;
+	}
 }
