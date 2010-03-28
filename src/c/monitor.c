@@ -18,6 +18,7 @@
 #define FALSE 0
 #define TRUE 1
 
+#define DEBUG 0
 #define CELL_COUNT 10
 #define CHARGER_RELAY_PORT 7
 #define CHARGER_ON_VOLTAGE 3550
@@ -302,8 +303,14 @@ int readEnough(int fd, char *buf, int length) {
 			continue;
 		}
 		actual += read(fd, buf + actual, 255 - actual);
-//		buf[actual] = 0;
-//		printf("read %d expecting %d %s\n", actual, length, buf);
+		buf[actual] = 0;
+		if (DEBUG) {
+			printf("read %d expecting %d '%s' ", actual, length, buf);
+			for (int j = 0; j < actual; j++) {
+				printf("%x ", buf[j]);
+			}
+			printf("\n");
+		}
 		if (actual >= length) {
 			break;
 		}
