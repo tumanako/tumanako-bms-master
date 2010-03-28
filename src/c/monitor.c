@@ -274,6 +274,9 @@ void sendCommand(int address, char sequence, char command) {
 	buf[5] = (char) address & 0x00FF;
 	buf[6] = sequence;
 	buf[7] = command;
+	if (DEBUG) {
+		printf("sending command '%c' to 0x%x%x\n", buf[7], buf[4], buf[5]);
+	}
 	writeSlowly(fd, buf, 8);
 }
 
