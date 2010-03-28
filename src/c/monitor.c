@@ -111,7 +111,6 @@ int main()
 		printf("%d ", (int) t);
 		printf("%lf ", chargercontrol_getChargeCurrent());
 		for (int i = 0; i < CELL_COUNT; i++) {
-			sleep(1);
 			getCellState(i);
 			printf("%5d %5d ", cells[i].vCell, cells[i].iShunt);
 			fflush(NULL);
