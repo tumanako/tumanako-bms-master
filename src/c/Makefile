@@ -1,7 +1,10 @@
 #
 # Makefile for U3 examples
 #
-MONITOR_SRC=monitor.c /home/tparker/labjack2/Linux_C_NativeUSB/Examples/U3/u3.c chargercontrol_labjack.c
+
+# CHARGER_CONTROL_SRC=chargercontrol_labjack.c /home/tparker/labjack2/Linux_C_NativeUSB/Examples/U3/u3.c
+CHARGER_CONTROL_SRC=chargercontrol_none.c
+MONITOR_SRC=monitor.c $(CHARGER_CONTROL_SRC)
 MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 
 SRCS=$(wildcard *.c)
