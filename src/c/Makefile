@@ -1,16 +1,16 @@
 #
 # Makefile for U3 examples
 #
-MONITOR_SRC=monitor.c /home/tparker/labjack2/Linux_C_NativeUSB/Examples/U3/u3.c
+MONITOR_SRC=monitor.c 
 MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 
 SRCS=$(wildcard *.c)
 HDRS=$(wildcard *.h)
 
-CFLAGS=-std=c99 -Wall -g -I/home/tparker/labjack2/Linux_C_NativeUSB/Examples/U3
+CFLAGS=-std=c99 -Wall -g 
 CC=gcc $(CFLAGS)
-LDFLAGS=-L/home/tparker/labjack2/Linux_C_NativeUSB/liblabjackusb/
-LIBS=-lm -llabjackusb
+LDFLAGS=
+LIBS=-lm 
 
 all: cycler
 
