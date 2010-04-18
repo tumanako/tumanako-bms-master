@@ -92,7 +92,12 @@ int main()
 	writeSlowly(fd, "garbage", 7);
 
 	for (int i = 0; i < CELL_COUNT; i++) {
-		sendCommand(cellIDs[i], seq++, 'g');
+		sendCommand(cellIDs[i], seq++, 'r');
+	}
+
+	sleep(1);
+
+	for (int i = 0; i < CELL_COUNT; i++) {
 		cells[i].minCurrent = 500;
 		setMinCurrent(i, 50);
 	}
