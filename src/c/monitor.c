@@ -165,8 +165,6 @@ void getCellState(int cellIndex) {
 	}
 	memcpy(status, buf, EVD5_STATUS_LENGTH);
 	char *sc = (char *) status;
-	sc[0] = buf[1];
-	sc[1] = buf[0];
 	if (status->cellAddress != cellIDs[cellIndex]) {
 		printf("\nSent message to %x but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
 		for (int i = 0; i < actualLength; i++) {
@@ -252,8 +250,9 @@ int avgVoltage() {
 
 void sendCommand(int address, char sequence, char command) {
 	char buf[] = "heloXXYX";
-	buf[4] = (char) ((address & 0xFF00) >> 8);
-	buf[5] = (char) address & 0x00FF;
+	// little endian
+	buf[4] = (char) address & 0x00FF;
+	buf[5] = (char) ((address & 0xFF00) >> 8);
 	buf[6] = sequence;
 	buf[7] = command;
 	if (DEBUG) {
