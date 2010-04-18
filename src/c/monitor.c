@@ -208,7 +208,7 @@ void setMinCurrent(int cellIndex, short minCurrent) {
 		buf[6] = 0;
 		char *endPtr;
 		int actual = strtol(buf, &endPtr, 10);
-		fprintf(stderr, "%c%c actual = %d\n", (char) ((cellIDs[cellIndex] & 0xFF00) >> 8), (char) cellIDs[cellIndex], actual);
+		fprintf(stderr, "%2d actual = %d\n", cellIDs[cellIndex], actual);
 		cells[cellIndex].minCurrent = actual;
 	}
 }
