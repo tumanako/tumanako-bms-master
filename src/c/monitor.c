@@ -33,7 +33,7 @@ void initCellIDArray();
 void sendCommand(int address, char sequenceNumber, char command);
 void getCellState(int cellIndex);
 void writeSlowly(int fd, char *s, int length);
-int readEnough(int fd, char *buf, int length);
+int readEnough(int fd, unsigned char *buf, int length);
 int maxVoltage();
 int minVoltage();
 int avgVoltage();
@@ -54,9 +54,7 @@ int cellIDs[CELL_COUNT];
 char chargerState = 0;
 int main()
 {
-    int res;
     struct termios oldtio,newtio;
-    char buf[255];
 
 	if (chargercontrol_init()) {
 		return 1;
@@ -138,7 +136,7 @@ int main()
 unsigned char sequenceNumber = 0;
 
 void getCellState(int cellIndex) {
-	char buf[255];
+	unsigned char buf[255];
 	unsigned char sentSequenceNumber, recSequenceNumber;
 	int actualLength;
 	struct evd5_status_t *status = &cells[cellIndex];
@@ -164,15 +162,14 @@ void getCellState(int cellIndex) {
 		return;
 	}
 	memcpy(status, buf, EVD5_STATUS_LENGTH);
-	char *sc = (char *) status;
 	if (status->cellAddress != cellIDs[cellIndex]) {
 		fprintf(stderr, "\nSent message to %x but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
 		for (int i = 0; i < actualLength; i++) {
-                        fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-                }
+			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+		}
 		exit(1);
 	}
-	//printf("Vc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic);
+	//fprintf(stderr, "Vc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic);
 }
 
 void turnUpHighCells() {
@@ -195,7 +192,7 @@ void turnDownCells() {
 
 void setMinCurrent(int cellIndex, short minCurrent) {
 	char command;
-	char buf[255];
+	unsigned char buf[255];
 	while(1) {
 		if (cells[cellIndex].minCurrent > 32000) {
 			command = '>';
@@ -269,11 +266,9 @@ void writeSlowly(int fd, char *s, int length) {
 	}
 }
 
-int readEnough(int fd, char *buf, int length) {
-
+int readEnough(int fd, unsigned char *buf, int length) {
 	fd_set rfds;
 	struct timeval tv;
-	int retval;
 	
 	FD_ZERO(&rfds);
 	FD_SET(fd, &rfds);
