@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "../../../slave/src/c/evd5.h"
+#include "crc.h"
 #include "chargercontrol.h"
 
 #define BAUDRATE B9600
@@ -137,39 +138,57 @@ unsigned char sequenceNumber = 0;
 
 void getCellState(int cellIndex) {
 	unsigned char buf[255];
-	unsigned char sentSequenceNumber, recSequenceNumber;
+	unsigned char sentSequenceNumber;
 	int actualLength;
 	struct evd5_status_t *status = &cells[cellIndex];
 	sentSequenceNumber = sequenceNumber++;
 	sendCommand(cellIDs[cellIndex], sentSequenceNumber, '/');
 	actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
-	if (actualLength > 12) {
-		recSequenceNumber = (unsigned char) buf[12];
-	}
-	if (actualLength != EVD5_STATUS_LENGTH || sentSequenceNumber != recSequenceNumber) {
-		int i;
-		fprintf(stderr, "read %d, expected %d from cell %d sent seq %x, rec seq %x\n", actualLength, EVD5_STATUS_LENGTH, cellIndex, 
-				sentSequenceNumber, recSequenceNumber);
-		for (i = 0; i < actualLength; i++) {
+	if (actualLength != EVD5_STATUS_LENGTH) {
+		fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellIDs[cellIndex]);
+		for (int i = 0; i < actualLength; i++) {
 			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
 		}
 		actualLength = readEnough(fd, buf, 255);
 		fprintf(stderr, "read %d more\n", actualLength);
-		for (i = 0; i < actualLength; i++) {
+		for (int i = 0; i < actualLength; i++) {
+			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+		}
+		exit(1);
+		return;
+	}
+	unsigned short *actualCRC = (unsigned short *) (buf + 18);
+	crc_t expectedCRC = crc_init();
+	expectedCRC = crc_update(expectedCRC, buf, 18);
+	expectedCRC = crc_finalize(expectedCRC);
+	if (expectedCRC != *actualCRC) {
+		fprintf(stderr, "\nSent message to %2d expected CRC 0x%x got 0x%x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
+		for (int i = 0; i < actualLength; i++) {
 			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
 		}
 		exit(1);
 		return;
 	}
 	memcpy(status, buf, EVD5_STATUS_LENGTH);
+	// have to copy this one separately because of padding
+	status->crc = *actualCRC;
 	if (status->cellAddress != cellIDs[cellIndex]) {
-		fprintf(stderr, "\nSent message to %x but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
+		fprintf(stderr, "\nSent message to %2d but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
 		for (int i = 0; i < actualLength; i++) {
 			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
 		}
 		exit(1);
+		return;
 	}
-	//fprintf(stderr, "Vc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic);
+	if (status->sequenceNumber != sentSequenceNumber) {
+		fprintf(stderr, "\nSent message to %2d with seq %x but recieved seq %x\n", cellIDs[cellIndex], sentSequenceNumber, status->sequenceNumber);
+		for (int i = 0; i < actualLength; i++) {
+			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+		}
+		exit(1);
+		return;
+	}
+	//fprintf(stderr, "\nVc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d crc=%x\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->crc);
 }
 
 void turnUpHighCells() {
