@@ -150,15 +150,15 @@ void getCellState(int cellIndex) {
 	}
 	if (actualLength != EVD5_STATUS_LENGTH || sentSequenceNumber != recSequenceNumber) {
 		int i;
-		printf("read %d, expected %d from cell %d sent seq %x, rec seq %x\n", actualLength, EVD5_STATUS_LENGTH, cellIndex, 
+		fprintf(stderr, "read %d, expected %d from cell %d sent seq %x, rec seq %x\n", actualLength, EVD5_STATUS_LENGTH, cellIndex, 
 				sentSequenceNumber, recSequenceNumber);
 		for (i = 0; i < actualLength; i++) {
-			printf("%d %x\n", i, (unsigned char) buf[i]);
+			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
 		}
 		actualLength = readEnough(fd, buf, 255);
-		printf("read %d more\n", actualLength);
+		fprintf(stderr, "read %d more\n", actualLength);
 		for (i = 0; i < actualLength; i++) {
-			printf("%d %x\n", i, (unsigned char) buf[i]);
+			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
 		}
 		exit(1);
 		return;
@@ -166,9 +166,9 @@ void getCellState(int cellIndex) {
 	memcpy(status, buf, EVD5_STATUS_LENGTH);
 	char *sc = (char *) status;
 	if (status->cellAddress != cellIDs[cellIndex]) {
-		printf("\nSent message to %x but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
+		fprintf(stderr, "\nSent message to %x but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
 		for (int i = 0; i < actualLength; i++) {
-                        printf("%d %x\n", i, (unsigned char) buf[i]);
+                        fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
                 }
 		exit(1);
 	}
@@ -256,7 +256,7 @@ void sendCommand(int address, char sequence, char command) {
 	buf[6] = sequence;
 	buf[7] = command;
 	if (DEBUG) {
-		printf("sending command '%c' to 0x%x%x\n", buf[7], buf[4], buf[5]);
+		fprintf(stderr, "sending command '%c' to 0x%x%x\n", buf[7], buf[4], buf[5]);
 	}
 	writeSlowly(fd, buf, 8);
 }
@@ -295,11 +295,11 @@ int readEnough(int fd, char *buf, int length) {
 		actual += read(fd, buf + actual, 255 - actual);
 		buf[actual] = 0;
 		if (DEBUG) {
-			printf("read %d expecting %d '%s' ", actual, length, buf);
+			fprintf(stderr, "read %d expecting %d '%s' ", actual, length, buf);
 			for (int j = 0; j < actual; j++) {
-				printf("%x ", buf[j]);
+				fprintf(stderr, "%x ", buf[j]);
 			}
-			printf("\n");
+			fprintf(stderr, "\n");
 		}
 		if (actual >= length) {
 			break;
