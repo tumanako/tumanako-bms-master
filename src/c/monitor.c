@@ -96,11 +96,9 @@ int main()
 
 	sleep(1);
 
-	for (int i = 0; i < CELL_COUNT; i++) {
-		cells[i].minCurrent = 500;
-		setMinCurrent(i, 50);
-	}
-	sleep(3);
+	// send some bytes to wake up the slaves (they drop characters while flashing the light)
+	writeSlowly(fd, "garbage", 7);
+
 	chargerState = 0;
 	printf("\n");
 	time_t last = 0;
@@ -228,7 +226,7 @@ void setMinCurrent(int cellIndex, short minCurrent) {
 		char *endPtr;
 		int actual = strtol(buf, &endPtr, 10);
 		fprintf(stderr, "%2d actual = %d\n", cellIDs[cellIndex], actual);
-		cells[cellIndex].minCurrent = actual;
+		getCellState(cellIndex);
 	}
 }
 
