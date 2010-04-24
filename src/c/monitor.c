@@ -157,9 +157,9 @@ void getCellState(int cellIndex) {
 		exit(1);
 		return;
 	}
-	unsigned short *actualCRC = (unsigned short *) (buf + 18);
+	unsigned short *actualCRC = (unsigned short *) (buf + EVD5_STATUS_LENGTH - sizeof(crc_t));
 	crc_t expectedCRC = crc_init();
-	expectedCRC = crc_update(expectedCRC, buf, 18);
+	expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
 	expectedCRC = crc_finalize(expectedCRC);
 	if (expectedCRC != *actualCRC) {
 		fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
