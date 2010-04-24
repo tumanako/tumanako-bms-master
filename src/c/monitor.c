@@ -162,7 +162,7 @@ void getCellState(int cellIndex) {
 	expectedCRC = crc_update(expectedCRC, buf, 18);
 	expectedCRC = crc_finalize(expectedCRC);
 	if (expectedCRC != *actualCRC) {
-		fprintf(stderr, "\nSent message to %2d expected CRC 0x%x got 0x%x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
+		fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
 		for (int i = 0; i < actualLength; i++) {
 			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
 		}
@@ -181,7 +181,7 @@ void getCellState(int cellIndex) {
 		return;
 	}
 	if (status->sequenceNumber != sentSequenceNumber) {
-		fprintf(stderr, "\nSent message to %2d with seq %x but recieved seq %x\n", cellIDs[cellIndex], sentSequenceNumber, status->sequenceNumber);
+		fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellIDs[cellIndex], sentSequenceNumber, status->sequenceNumber);
 		for (int i = 0; i < actualLength; i++) {
 			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
 		}
