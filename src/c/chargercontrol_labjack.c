@@ -147,10 +147,10 @@ int setWatchdog(HANDLE hDevice) {
     printf("ConfigU3 error : read buffer received errorcode %d\n", recBuff[6]);
     return -1;
   }
-  /*for (int i = 0; i < 16; i++) {
-     printf("%x ", recBuff[i]);
-  }
-  printf("\n"); */
+//  for (int i = 0; i < 16; i++) {
+//     printf("%02x ", recBuff[i]);
+//  }
+//  printf("\n");
   return 0;
 }
 
