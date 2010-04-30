@@ -325,8 +325,8 @@ int readEnough(int fd, unsigned char *buf, int length) {
 	FD_ZERO(&rfds);
 	FD_SET(fd, &rfds);
 
-	tv.tv_sec = 5;
-	tv.tv_usec = 0;
+	tv.tv_sec = 0;
+	tv.tv_usec = 200000;
 
 	int actual = 0;
 	for (int i = 0; i < 5; i++) {
