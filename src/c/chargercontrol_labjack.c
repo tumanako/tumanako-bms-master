@@ -1,5 +1,5 @@
 /*
-    Copyright 2009 Tom Parker
+    Copyright 2009, 2010 Tom Parker
 
     This file is part of the Tumanako EVD5 BMS.
 
@@ -20,8 +20,10 @@
 
 #include "u3.h"
 #include "chargercontrol.h"
+#include "buscontrol.h"
 
 #define CHARGER_RELAY_PORT 7
+#define BUS_RELAY_PORT 6
 #define LJ_ID -1
 #define CHARGE_CURRENT_OVERSAMPLING 5
 #define CHARGE_CURRENT_CHANNEL 4
@@ -50,10 +52,21 @@ int chargercontrol_init()
 
 	// turn off charger
 	eDO(hDevice, 1, CHARGER_RELAY_PORT, 0);
+	buscontrol_setBus(0);
 	setWatchdog(hDevice);
 
 	chargeCurrentZero = getReading(4);
 	fprintf(stderr, "voltage at zero current is %lf\n", chargeCurrentZero);
+	return 0;
+}
+
+void chargercontrol_shutdown() {
+	chargercontrol_setCharger(0);
+	buscontrol_setBus(0);
+}
+
+int buscontrol_init() {
+	// don't need to do any additional setup
 	return 0;
 }
 
@@ -62,6 +75,14 @@ void chargercontrol_setCharger(char on) {
 		eDO(hDevice, 1, CHARGER_RELAY_PORT, 1);
 	} else {
 		eDO(hDevice, 1, CHARGER_RELAY_PORT, 0);
+	}
+}
+
+void buscontrol_setBus(char on) {
+	if (on) {
+		eDO(hDevice, 1, BUS_RELAY_PORT, 1);
+	} else {
+		eDO(hDevice, 1, BUS_RELAY_PORT, 0);
 	}
 }
 

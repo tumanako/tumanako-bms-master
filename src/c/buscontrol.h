@@ -1,5 +1,5 @@
 /*
-    Copyright 2009 Tom Parker
+    Copyright 2010 Tom Parker
 
     This file is part of the Tumanako EVD5 BMS.
 
@@ -18,14 +18,12 @@
     <http://www.gnu.org/licenses/>.
 */
 
-// Charger Control Interface
+// Bus Control Interface
 
 /** 
  * Initialisation function, must be called first
  *
  * @return 0 if successful
  */
-int chargercontrol_init();
-double chargercontrol_getChargeCurrent();
-void chargercontrol_setCharger(char on);
-void chargercontrol_shutdown();
+int buscontrol_init();
+void buscontrol_setBus(char on);
