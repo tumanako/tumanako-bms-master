@@ -45,6 +45,7 @@ int totalVoltage();
 void turnUpHighCells();
 void turnDownCells();
 void setMinCurrent(int cellIndex, short minCurrent);
+void dumpBuffer(unsigned char * buf, int length);
 
 int fd;
 
@@ -166,14 +167,10 @@ void getCellState(int cellIndex) {
 		actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
 		if (actualLength != EVD5_STATUS_LENGTH) {
 			fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellIDs[cellIndex]);
-			for (int i = 0; i < actualLength; i++) {
-				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-			}
+			dumpBuffer(buf, actualLength);
 			int secondLength = readEnough(fd, buf, 255);
 			fprintf(stderr, "read %d more\n", secondLength);
-			for (int i = 0; i < secondLength; i++) {
-				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-			}
+			dumpBuffer(buf, secondLength);
 			continue;
 		}
 		unsigned short *actualCRC = (unsigned short *) (buf + EVD5_STATUS_LENGTH - sizeof(crc_t));
@@ -182,9 +179,7 @@ void getCellState(int cellIndex) {
 		expectedCRC = crc_finalize(expectedCRC);
 		if (expectedCRC != *actualCRC) {
 			fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
-				for (int i = 0; i < actualLength; i++) {
-					fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-			}
+			dumpBuffer(buf, actualLength);
 			continue;
 		}
 		memcpy(status, buf, EVD5_STATUS_LENGTH);
@@ -192,16 +187,12 @@ void getCellState(int cellIndex) {
 		status->crc = *actualCRC;
 		if (status->cellAddress != cellIDs[cellIndex]) {
 			fprintf(stderr, "\nSent message to %2d but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
-			for (int i = 0; i < actualLength; i++) {
-				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-			}
+			dumpBuffer(buf, actualLength);
 			continue;
 		}
 		if (status->sequenceNumber != sentSequenceNumber) {
 			fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellIDs[cellIndex], sentSequenceNumber, status->sequenceNumber);
-			for (int i = 0; i < actualLength; i++) {
-				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-			}
+			dumpBuffer(buf, actualLength);
 			continue;
 		}
 		//fprintf(stderr, "\nVc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d crc=%x\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->crc);
@@ -362,6 +353,14 @@ int readEnough(int fd, unsigned char *buf, int length) {
 		}
 	}
 	return actual;
+}
+
+void dumpBuffer(unsigned char *buf, int length) {
+	if (DEBUG) {
+		for (int i = 0; i < length; i++) {
+			fprintf(stderr, "%d %x\n", i,  buf[i]);
+		}
+	}
 }
 
 void initCellIDArray() {
