@@ -51,7 +51,7 @@ int chargercontrol_init()
 		return(1);
 
 	// turn off charger
-	eDO(hDevice, 1, CHARGER_RELAY_PORT, 0);
+	chargercontrol_setCharger(0);
 	buscontrol_setBus(0);
 	setWatchdog(hDevice);
 
