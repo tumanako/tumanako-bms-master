@@ -12,6 +12,7 @@
 #include "../../../slave/src/c/evd5.h"
 #include "crc.h"
 #include "chargercontrol.h"
+#include "buscontrol.h"
 
 #define BAUDRATE B9600
 #define MODEMDEVICE "/dev/ttyS0"
@@ -61,6 +62,11 @@ int main()
 		return 1;
 	}
 
+	if (buscontrol_init()) {
+		return 1;
+	}
+
+	buscontrol_setBus(TRUE);
     fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY );
     if (fd <0) {
         perror(MODEMDEVICE);
@@ -135,58 +141,69 @@ int main()
 unsigned char sequenceNumber = 0;
 
 void getCellState(int cellIndex) {
-	unsigned char buf[255];
-	unsigned char sentSequenceNumber;
-	int actualLength;
-	struct evd5_status_t *status = &cells[cellIndex];
-	sentSequenceNumber = sequenceNumber++;
-	sendCommand(cellIDs[cellIndex], sentSequenceNumber, '/');
-	actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
-	if (actualLength != EVD5_STATUS_LENGTH) {
-		fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellIDs[cellIndex]);
-		for (int i = 0; i < actualLength; i++) {
-			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+	int actualLength = 0;
+	for (int attempt = 0; TRUE; attempt++) {
+		if (attempt > 4) {
+			printf("%d bus errors, exiting\n", attempt);
+			chargercontrol_shutdown();
+			exit(1);
 		}
-		actualLength = readEnough(fd, buf, 255);
-		fprintf(stderr, "read %d more\n", actualLength);
-		for (int i = 0; i < actualLength; i++) {
-			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+		if (attempt > 0 && actualLength == 0) {
+			fprintf(stderr, "no response, resetting\n");
+			buscontrol_setBus(FALSE);
+			sleep(1);
+			buscontrol_setBus(TRUE);
+			sleep(1);
 		}
-		exit(1);
-		return;
+		unsigned char buf[255];
+		unsigned char sentSequenceNumber;
+		struct evd5_status_t *status = &cells[cellIndex];
+		sentSequenceNumber = sequenceNumber++;
+		sendCommand(cellIDs[cellIndex], sentSequenceNumber, '/');
+		actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
+		if (actualLength != EVD5_STATUS_LENGTH) {
+			fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellIDs[cellIndex]);
+			for (int i = 0; i < actualLength; i++) {
+				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+			}
+			int secondLength = readEnough(fd, buf, 255);
+			fprintf(stderr, "read %d more\n", secondLength);
+			for (int i = 0; i < secondLength; i++) {
+				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+			}
+			continue;
+		}
+		unsigned short *actualCRC = (unsigned short *) (buf + EVD5_STATUS_LENGTH - sizeof(crc_t));
+		crc_t expectedCRC = crc_init();
+		expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
+		expectedCRC = crc_finalize(expectedCRC);
+		if (expectedCRC != *actualCRC) {
+			fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
+				for (int i = 0; i < actualLength; i++) {
+					fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+			}
+			continue;
+		}
+		memcpy(status, buf, EVD5_STATUS_LENGTH);
+		// have to copy this one separately because of padding
+		status->crc = *actualCRC;
+		if (status->cellAddress != cellIDs[cellIndex]) {
+			fprintf(stderr, "\nSent message to %2d but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
+			for (int i = 0; i < actualLength; i++) {
+				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+			}
+			continue;
+		}
+		if (status->sequenceNumber != sentSequenceNumber) {
+			fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellIDs[cellIndex], sentSequenceNumber, status->sequenceNumber);
+			for (int i = 0; i < actualLength; i++) {
+				fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
+			}
+			continue;
+		}
+		//fprintf(stderr, "\nVc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d crc=%x\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->crc);
+		break;
 	}
-	unsigned short *actualCRC = (unsigned short *) (buf + EVD5_STATUS_LENGTH - sizeof(crc_t));
-	crc_t expectedCRC = crc_init();
-	expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
-	expectedCRC = crc_finalize(expectedCRC);
-	if (expectedCRC != *actualCRC) {
-		fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
-		for (int i = 0; i < actualLength; i++) {
-			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-		}
-		exit(1);
-		return;
-	}
-	memcpy(status, buf, EVD5_STATUS_LENGTH);
-	// have to copy this one separately because of padding
-	status->crc = *actualCRC;
-	if (status->cellAddress != cellIDs[cellIndex]) {
-		fprintf(stderr, "\nSent message to %2d but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
-		for (int i = 0; i < actualLength; i++) {
-			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-		}
-		exit(1);
-		return;
-	}
-	if (status->sequenceNumber != sentSequenceNumber) {
-		fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellIDs[cellIndex], sentSequenceNumber, status->sequenceNumber);
-		for (int i = 0; i < actualLength; i++) {
-			fprintf(stderr, "%d %x\n", i, (unsigned char) buf[i]);
-		}
-		exit(1);
-		return;
-	}
-	//fprintf(stderr, "\nVc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d crc=%x\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->crc);
 }
 
 void turnUpHighCells() {
