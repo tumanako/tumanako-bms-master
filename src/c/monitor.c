@@ -37,7 +37,9 @@ void getCellState(int cellIndex);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, unsigned char *buf, int length);
 int maxVoltage();
+int maxVoltageCell();
 int minVoltage();
+int minVoltageCell();
 int avgVoltage();
 int totalVoltage();
 void turnUpHighCells();
@@ -131,7 +133,8 @@ int main()
 			chargercontrol_setCharger(TRUE);
 			chargerState = 1;
 		}
-		fprintf(stderr, "%d %d %d %d %s\n", minVoltage(), avgVoltage(), maxVoltage(), totalVoltage(), chargerState ? "on" : "off");
+		fprintf(stderr, "%d@%02d %d %d@%02d %d %f %s\n", minVoltage(), minVoltageCell(), avgVoltage(), maxVoltage(), maxVoltageCell(), 
+				totalVoltage(), chargercontrol_getChargeCurrent(), chargerState ? "on" : "off");
 		turnDownCells();
 		fflush(NULL);
 	}
@@ -257,11 +260,35 @@ int minVoltage() {
 	return result;
 }
 
+int minVoltageCell() {
+	int min = 999999;
+	int result = 0;
+	for (int i = 0; i < CELL_COUNT; i++) {
+		if (cells[i].vCell < min) {
+			min = cells[i].vCell;
+			result = i;
+		}
+	}
+	return result;
+}
+
 int maxVoltage() {
 	int result = 0;
 	for (int i = 0; i < CELL_COUNT; i++) {
 		if (cells[i].vCell > result) {
 			result = cells[i].vCell;
+		}
+	}
+	return result;
+}
+
+int maxVoltageCell() {
+	int max = 0;
+	int result = 0;
+	for (int i = 0; i < CELL_COUNT; i++) {
+		if (cells[i].vCell > max) {
+			max = cells[i].vCell;
+			result = i;
 		}
 	}
 	return result;
