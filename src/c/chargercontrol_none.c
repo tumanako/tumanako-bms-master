@@ -31,3 +31,16 @@ double chargercontrol_getChargeCurrent() {
 void chargercontrol_setCharger(char on) {
 	return;
 }
+
+void chargercontrol_shutdown() {
+	return;
+}
+
+int buscontrol_init() {
+	return 0;
+}
+
+void buscontrol_setBus(char on) {
+	return;
+}
+
