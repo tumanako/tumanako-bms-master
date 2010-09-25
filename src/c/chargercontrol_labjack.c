@@ -168,6 +168,6 @@ double getReading(int channel) {
 double chargercontrol_getChargeCurrent() {
 	double value = getReading(CHARGE_CURRENT_CHANNEL);
 	double result = (chargeCurrentZero - value) / 0.020 * (3 / 2.7);
-	//printf("%lf %lf %lf\n", result, value, zero);
+	//fprintf(stderr, "%lf %lf %lf\n", result, value, chargeCurrentZero);
 	return result;
 }
