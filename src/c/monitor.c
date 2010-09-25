@@ -26,6 +26,8 @@
 #define CHARGER_RELAY_PORT 7
 #define CHARGER_ON_VOLTAGE 3550
 #define CHARGER_OFF_VOLTAGE 3650
+#define SHUNT_ON_VOLTAGE 3500
+#define SHUNT_MAX_CURRENT 500
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
 #define LJ_ID -1
 #define CHARGE_CURRENT_OVERSAMPLING 5
@@ -42,8 +44,7 @@ int minVoltage();
 int minVoltageCell();
 int avgVoltage();
 int totalVoltage();
-void turnUpHighCells();
-void turnDownCells();
+void setShuntCurrent();
 void setMinCurrent(int cellIndex, short minCurrent);
 void dumpBuffer(unsigned char * buf, int length);
 
@@ -136,7 +137,7 @@ int main()
 		}
 		fprintf(stderr, "%d@%02d %d %d@%02d %d %f %s\n", minVoltage(), minVoltageCell(), avgVoltage(), maxVoltage(), maxVoltageCell(), 
 				totalVoltage(), chargercontrol_getChargeCurrent(), chargerState ? "on" : "off");
-		turnDownCells();
+		setShuntCurrent();
 		fflush(NULL);
 	}
     	tcsetattr(fd,TCSANOW,&oldtio);
@@ -200,18 +201,15 @@ void getCellState(int cellIndex) {
 	}
 }
 
-void turnUpHighCells() {
+void setShuntCurrent() {
 	for (int i = 0; i < CELL_COUNT; i++) {
-		if (cells[i].vCell > CHARGER_ON_VOLTAGE) {
-			setMinCurrent(i, 500);
-		}
-	}
-}
-
-void turnDownCells() {
-	for (int i = 0; i < CELL_COUNT; i++) {
-		if (cells[i].vCell > CHARGER_ON_VOLTAGE - 10 && !chargerState) {
-			setMinCurrent(i, 500);
+		if (cells[i].vCell > SHUNT_ON_VOLTAGE) {
+			short difference = cells[i].vCell - SHUNT_ON_VOLTAGE;
+			short target = (difference / 25) * 50 + 50;
+			if (target > SHUNT_MAX_CURRENT) {
+				target = SHUNT_MAX_CURRENT;
+			}
+			setMinCurrent(i, target);
 		} else {
 			setMinCurrent(i, 0);
 		}
