@@ -109,10 +109,15 @@ int main()
 	// send some bytes to wake up the slaves (they drop characters while flashing the light)
 	writeSlowly(fd, "garbage", 7);
 
+	// clear the screen
+	write(2,"\E[H\E[2J",7);
+
 	chargerState = 0;
 	printf("\n");
 	time_t last = 0;
 	while (1) {
+		// move to the top of the screen
+		write(2,"\E[H",3);
 		time_t t;
 		time(&t);
 		if (t == last) {
@@ -125,6 +130,8 @@ int main()
 		for (int i = 0; i < CELL_COUNT; i++) {
 			getCellState(i);
 			printf("%5d %5d ", cells[i].vCell, cells[i].iShunt);
+			struct evd5_status_t *status = &cells[i];
+			fprintf(stderr, "%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x\n", i, cellIDs[i], status->vCell, status->vShunt, status->iShunt, status->minCurrent, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc);
 			fflush(NULL);
 		}
 		printf("\n");
@@ -196,7 +203,6 @@ void getCellState(int cellIndex) {
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
-		//fprintf(stderr, "\nVc=%d Vs=%d Is=%d Q=? Vt=%d Vg=%d g=%d hasRx=%d sa=%d auto=%d crc=%x\n", status->vCell, status->vShunt, status->iShunt, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->crc);
 		break;
 	}
 }
