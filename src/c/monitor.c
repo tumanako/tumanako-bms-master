@@ -210,8 +210,13 @@ void getCellState(int cellIndex) {
 void setShuntCurrent() {
 	for (int i = 0; i < CELL_COUNT; i++) {
 		if (cells[i].vCell > SHUNT_ON_VOLTAGE) {
+			// TODO should we shunt on the difference between cell and the average
+			// rather than the difference between the cell and some absolute?
 			short difference = cells[i].vCell - SHUNT_ON_VOLTAGE;
 			short target = (difference / 25) * 50 + 50;
+			if (cells[i].vCell - avgVoltage() < 20) {
+				target = 0;
+			}
 			if (target > SHUNT_MAX_CURRENT) {
 				target = SHUNT_MAX_CURRENT;
 			}
