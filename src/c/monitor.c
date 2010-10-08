@@ -131,7 +131,17 @@ int main()
 			getCellState(i);
 			printf("%5d %5d ", cells[i].vCell, cells[i].iShunt);
 			struct evd5_status_t *status = &cells[i];
-			fprintf(stderr, "%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x\n", i, cellIDs[i], status->vCell, status->vShunt, status->iShunt, status->minCurrent, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc);
+			fprintf(stderr, "%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x ", i, cellIDs[i], status->vCell, status->vShunt, status->iShunt, status->minCurrent, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc);
+			unsigned char tens = (status->vCell / 10) % 10;
+			unsigned char hundreds = (status->vCell / 100) % 10;
+			for (int j = 0; j < hundreds; j++) {
+				fprintf(stderr, "*");
+			}
+			for (int j = 0; j < tens; j++) {
+				fprintf(stderr, "-");
+			}
+			write(2,"\E[K",3);
+			fprintf(stderr, "\n");
 			fflush(NULL);
 		}
 		printf("\n");
