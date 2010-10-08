@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -20,9 +22,8 @@
 #define FALSE 0
 #define TRUE 1
 
+#define CELL_ID_FILE "cells.txt"
 #define DEBUG 0
-#define CELL_COUNT 10
-#define CELL_ID_BASE 0
 #define CHARGER_RELAY_PORT 7
 #define CHARGER_ON_VOLTAGE 3550
 #define CHARGER_OFF_VOLTAGE 3650
@@ -50,12 +51,9 @@ void dumpBuffer(unsigned char * buf, int length);
 
 int fd;
 
-struct evd5_status_t cells[CELL_COUNT];
-
-//int cellIDs[CELL_COUNT] = { 0x3030, 0x3032, 0x3033 };
-//int cellIDs[CELL_COUNT] = { 0x3035, 0x3038, 0x3039 };
-//int cellIDs[CELL_COUNT] = { 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 };
-int cellIDs[CELL_COUNT];
+struct evd5_status_t *cells;
+int *cellIDs;
+int cellCount;
 
 char chargerState = 0;
 int main()
@@ -100,7 +98,7 @@ int main()
 	// send some bytes to wake up the slaves
 	writeSlowly(fd, "garbage", 7);
 
-	for (int i = 0; i < CELL_COUNT; i++) {
+	for (int i = 0; i < cellCount; i++) {
 		sendCommand(cellIDs[i], seq++, 'r');
 	}
 
@@ -127,7 +125,7 @@ int main()
 		last = t;
 		printf("%d ", (int) t);
 		printf("%lf ", chargercontrol_getChargeCurrent());
-		for (int i = 0; i < CELL_COUNT; i++) {
+		for (int i = 0; i < cellCount; i++) {
 			getCellState(i);
 			printf("%5d %5d ", cells[i].vCell, cells[i].iShunt);
 			struct evd5_status_t *status = &cells[i];
@@ -218,7 +216,7 @@ void getCellState(int cellIndex) {
 }
 
 void setShuntCurrent() {
-	for (int i = 0; i < CELL_COUNT; i++) {
+	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell > SHUNT_ON_VOLTAGE) {
 			// TODO should we shunt on the difference between cell and the average
 			// rather than the difference between the cell and some absolute?
@@ -262,7 +260,7 @@ void setMinCurrent(int cellIndex, short minCurrent) {
 
 int minVoltage() {
 	int result = 999999;
-	for (int i = 0; i < CELL_COUNT; i++) {
+	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell < result) {
 			result = cells[i].vCell;
 		}
@@ -273,7 +271,7 @@ int minVoltage() {
 int minVoltageCell() {
 	int min = 999999;
 	int result = 0;
-	for (int i = 0; i < CELL_COUNT; i++) {
+	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell < min) {
 			min = cells[i].vCell;
 			result = cellIDs[i];
@@ -284,7 +282,7 @@ int minVoltageCell() {
 
 int maxVoltage() {
 	int result = 0;
-	for (int i = 0; i < CELL_COUNT; i++) {
+	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell > result) {
 			result = cells[i].vCell;
 		}
@@ -295,7 +293,7 @@ int maxVoltage() {
 int maxVoltageCell() {
 	int max = 0;
 	int result = 0;
-	for (int i = 0; i < CELL_COUNT; i++) {
+	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell > max) {
 			max = cells[i].vCell;
 			result = cellIDs[i];
@@ -306,14 +304,14 @@ int maxVoltageCell() {
 
 int totalVoltage() {
 	int result = 0;
-	for (int i = 0; i < CELL_COUNT; i++) {
+	for (int i = 0; i < cellCount; i++) {
 		result += cells[i].vCell;
 	}
 	return result;
 }
 
 int avgVoltage() {
-	return totalVoltage() / CELL_COUNT;
+	return totalVoltage() / cellCount;
 }
 
 void sendCommand(int address, char sequence, char command) {
@@ -383,7 +381,23 @@ void dumpBuffer(unsigned char *buf, int length) {
 }
 
 void initCellIDArray() {
-	for (int i = 0; i < CELL_COUNT; i++) {
-		cellIDs[i] = CELL_ID_BASE + i;
+	int id;
+	int count = 0;
+	FILE *in = fopen(CELL_ID_FILE, "r");
+	while (EOF != fscanf(in, "%d\n", &id)) {
+		count++;
 	}
+	fclose(in);
+	printf("Have %d cells\n", count);
+	
+	cellIDs = malloc(count * sizeof(int));
+	cells = malloc(count * sizeof(struct evd5_status_t));
+	cellCount = count;
+	
+	count = 0;
+	in = fopen(CELL_ID_FILE, "r");
+	while (EOF != fscanf(in, "%d\n", &id)) {
+		cellIDs[count++] = id;
+	}
+	fclose(in);
 }
