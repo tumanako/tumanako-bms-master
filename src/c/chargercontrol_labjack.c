@@ -28,7 +28,7 @@
 #define CHARGE_CURRENT_OVERSAMPLING 5
 #define CHARGE_CURRENT_CHANNEL 4
 
-int setWatchdog(HANDLE hDevice);
+int setWatchdog(HANDLE hDevice, char reset);
 double getReading(int channel);
 
 int fd;
@@ -53,7 +53,10 @@ int chargercontrol_init()
 	// turn off charger
 	chargercontrol_setCharger(0);
 	buscontrol_setBus(0);
-	setWatchdog(hDevice);
+	
+	// we have to disable and enable the watchdog to get it to work?
+	setWatchdog(hDevice, 0);
+	setWatchdog(hDevice, 1);
 
 	chargeCurrentZero = getReading(4);
 	fprintf(stderr, "voltage at zero current is %lf\n", chargeCurrentZero);
@@ -86,7 +89,7 @@ void buscontrol_setBus(char on) {
 	}
 }
 
-int setWatchdog(HANDLE hDevice) {
+int setWatchdog(HANDLE hDevice, char reset) {
   
   uint8 sendBuff[26];
   uint8 recBuff[38];
@@ -98,14 +101,27 @@ int setWatchdog(HANDLE hDevice) {
   for(int i = 0; i < 26; i++)
     sendBuff[i] = 0;
 
+//Disable 0x44, 0xf8, 0x5, 0x9, 0x3d, 0x0, 0x1, 0x0, 0x3c, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
+//Enable  0x32, 0xf8, 0x5, 0x9, 0x2b, 0x0, 0x1, 0x20, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
+
   sendBuff[1] = (uint8)(0xF8);  //Command byte
   sendBuff[2] = (uint8)(0x05);  //Number of data words
   sendBuff[3] = (uint8)(0x09);  //Extended command number
+  
   sendBuff[6] = 0x01;           // write?
 //  sendBuff[7] = 0x18;           // set DO and reset
-  sendBuff[7] = 0x10;           // reset
-  sendBuff[8] = 0x14;           // timeout MSB
-  sendBuff[9] = 0x00;           // timeout LSB
+  if (reset) {
+    sendBuff[7] = 0x20;           // reset
+  } else {
+    sendBuff[7] = 0x00;           // don't reset
+  }
+  if (reset) {
+    sendBuff[8] = 0x0A;           // timeout MSB
+    sendBuff[9] = 0x00;           // timeout LSB
+  } else {
+    sendBuff[8] = 0xff;           // timeout MSB
+    sendBuff[9] = 0xff;           // timeout LSB
+  }
   sendBuff[10] = CHARGER_RELAY_PORT;          // set DO 4 to low
   sendBuff[0] = extendedChecksum8(sendBuff);
   extendedChecksum(sendBuff, 16);
