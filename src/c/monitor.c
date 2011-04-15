@@ -46,7 +46,7 @@ int minVoltageCell();
 int avgVoltage();
 int totalVoltage();
 void setShuntCurrent();
-void setMinCurrent(int cellIndex, short minCurrent);
+void setMinCurrent(int cellIndex, unsigned short minCurrent);
 void dumpBuffer(unsigned char * buf, int length);
 
 int fd;
@@ -221,7 +221,7 @@ void setShuntCurrent() {
 			// TODO should we shunt on the difference between cell and the average
 			// rather than the difference between the cell and some absolute?
 			short difference = cells[i].vCell - SHUNT_ON_VOLTAGE;
-			short target = (difference / 25) * 50 + 50;
+			unsigned short target = (difference / 25) * 50 + 50;
 			if (cells[i].vCell - avgVoltage() < 20) {
 				target = 0;
 			}
@@ -235,13 +235,14 @@ void setShuntCurrent() {
 	}
 }
 
-void setMinCurrent(int cellIndex, short minCurrent) {
+void setMinCurrent(int cellIndex, unsigned short minCurrent) {
 	char command;
 	unsigned char buf[255];
-	while(1) {
-		if (cells[cellIndex].minCurrent > 32000) {
-			command = '>';
-		} else if (cells[cellIndex].minCurrent > minCurrent) {
+	if (minCurrent > SHUNT_MAX_CURRENT) {
+			minCurrent = SHUNT_MAX_CURRENT;
+	}
+	for (int i = 0; i < 10; i++) {
+		if (cells[cellIndex].minCurrent > minCurrent) {
 			command = '<';
 		} else if (cells[cellIndex].minCurrent < minCurrent) {
 			command = '>';
@@ -250,12 +251,14 @@ void setMinCurrent(int cellIndex, short minCurrent) {
 		}
 		sendCommand(cellIDs[cellIndex], '0', command);
 		readEnough(fd, buf, 5);
-		buf[6] = 0;
-		char *endPtr;
-		int actual = strtol(buf, &endPtr, 10);
-		fprintf(stderr, "%2d actual = %d\n", cellIDs[cellIndex], actual);
-		getCellState(cellIndex);
 	}
+	// couldn't get to desired current after 10 attempts???
+	chargercontrol_shutdown();
+	buf[6] = 0;
+	char *endPtr;
+	int actual = strtol(buf, &endPtr, 10);
+	fprintf(stderr, "%2d trying to get to %d but had %d actual = %d\n", cellIDs[cellIndex], minCurrent, cells[cellIndex].minCurrent, actual);
+	exit(1);
 }
 
 int minVoltage() {
