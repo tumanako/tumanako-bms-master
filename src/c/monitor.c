@@ -37,6 +37,7 @@
 void initCellIDArray();
 void sendCommand(int address, char sequenceNumber, char command);
 void getCellState(int cellIndex);
+char _getCellState(int cellID, struct evd5_status_t* status, int attempts);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, unsigned char *buf, int length);
 int maxVoltage();
@@ -48,6 +49,7 @@ int totalVoltage();
 void setShuntCurrent();
 void setMinCurrent(int cellIndex, unsigned short minCurrent);
 void dumpBuffer(unsigned char * buf, int length);
+void findCells();
 
 int fd;
 
@@ -107,6 +109,8 @@ int main()
 	// send some bytes to wake up the slaves (they drop characters while flashing the light)
 	writeSlowly(fd, "garbage", 7);
 
+	// findCells();
+
 	// clear the screen
 	write(2,"\E[H\E[2J",7);
 
@@ -161,9 +165,19 @@ int main()
 unsigned char sequenceNumber = 0;
 
 void getCellState(int cellIndex) {
+	char success = _getCellState(cellIDs[cellIndex], &cells[cellIndex], 4);
+	if (!success) {
+		printf("bus errors, exiting\n");
+		chargercontrol_shutdown();
+		exit(1);
+	}
+}
+
+char _getCellState(int cellID, struct evd5_status_t* status, int maxAttempts) {
 	int actualLength = 0;
 	for (int attempt = 0; TRUE; attempt++) {
-		if (attempt > 4) {
+		if (attempt >= maxAttempts) {
+			return 0;
 			printf("%d bus errors, exiting\n", attempt);
 			chargercontrol_shutdown();
 			exit(1);
@@ -177,15 +191,14 @@ void getCellState(int cellIndex) {
 		}
 		unsigned char buf[255];
 		unsigned char sentSequenceNumber;
-		struct evd5_status_t *status = &cells[cellIndex];
 		sentSequenceNumber = sequenceNumber++;
-		sendCommand(cellIDs[cellIndex], sentSequenceNumber, '/');
+		sendCommand(cellID, sentSequenceNumber, '/');
 		actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
 		if (actualLength != EVD5_STATUS_LENGTH) {
-			fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellIDs[cellIndex]);
+			// fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellID);
 			dumpBuffer(buf, actualLength);
 			int secondLength = readEnough(fd, buf, 255);
-			fprintf(stderr, "read %d more\n", secondLength);
+			// fprintf(stderr, "read %d more\n", secondLength);
 			dumpBuffer(buf, secondLength);
 			continue;
 		}
@@ -194,25 +207,26 @@ void getCellState(int cellIndex) {
 		expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
 		expectedCRC = crc_finalize(expectedCRC);
 		if (expectedCRC != *actualCRC) {
-			fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cellIDs[cellIndex], expectedCRC, *actualCRC);
+			fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cellID, expectedCRC, *actualCRC);
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
 		memcpy(status, buf, EVD5_STATUS_LENGTH);
 		// have to copy this one separately because of padding
 		status->crc = *actualCRC;
-		if (status->cellAddress != cellIDs[cellIndex]) {
-			fprintf(stderr, "\nSent message to %2d but recieved response from %x\n", cellIDs[cellIndex], status->cellAddress);
+		if (status->cellAddress != cellID) {
+			fprintf(stderr, "\nSent message to %2d but recieved response from %x\n", cellID, status->cellAddress);
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
 		if (status->sequenceNumber != sentSequenceNumber) {
-			fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellIDs[cellIndex], sentSequenceNumber, status->sequenceNumber);
+			fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellID, sentSequenceNumber, status->sequenceNumber);
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
 		break;
 	}
+	return 1;
 }
 
 void setShuntCurrent() {
@@ -403,4 +417,16 @@ void initCellIDArray() {
 		cellIDs[count++] = id;
 	}
 	fclose(in);
+}
+
+void findCells() {
+	struct evd5_status_t status;
+	for (int i = 0; i < 255; i++) {
+		_getCellState(i, &status, 1);
+		if (status.cellAddress == i) {
+			printf("found cell at %d\n", i);
+		} else {
+			printf("found nothing at %d\n", i);
+		}
+	}
 }
