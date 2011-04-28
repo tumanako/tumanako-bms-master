@@ -30,9 +30,7 @@
 #define SHUNT_ON_VOLTAGE 3500
 #define SHUNT_MAX_CURRENT 500
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
-#define LJ_ID -1
 #define CHARGE_CURRENT_OVERSAMPLING 5
-#define CHARGE_CURRENT_CHANNEL 4
 
 void initCellIDArray();
 void sendCommand(int address, char sequenceNumber, char command);
