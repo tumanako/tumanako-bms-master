@@ -256,22 +256,23 @@ void setMinCurrent(int cellIndex, unsigned short minCurrent) {
 	if (minCurrent > SHUNT_MAX_CURRENT) {
 			minCurrent = SHUNT_MAX_CURRENT;
 	}
-	for (int i = 0; i < 10; i++) {
-		if (cells[cellIndex].minCurrent > minCurrent) {
+	int actual = SHUNT_MAX_CURRENT + 1;
+	for (int i = 0; i < 20; i++) {
+		if (actual > minCurrent) {
 			command = '<';
-		} else if (cells[cellIndex].minCurrent < minCurrent) {
+		} else if (actual < minCurrent) {
 			command = '>';
 		} else {
 			return;
 		}
 		sendCommand(cellIDs[cellIndex], '0', command);
 		readEnough(fd, buf, 5);
+		buf[6] = 0;
+		char *endPtr;
+		actual = strtol(buf, &endPtr, 10);
 	}
 	// couldn't get to desired current after 10 attempts???
 	chargercontrol_shutdown();
-	buf[6] = 0;
-	char *endPtr;
-	int actual = strtol(buf, &endPtr, 10);
 	fprintf(stderr, "%2d trying to get to %d but had %d actual = %d\n", cellIDs[cellIndex], minCurrent, cells[cellIndex].minCurrent, actual);
 	exit(1);
 }
