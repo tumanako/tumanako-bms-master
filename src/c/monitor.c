@@ -405,7 +405,7 @@ void initCellIDArray() {
 		count++;
 	}
 	fclose(in);
-	printf("Have %d cells\n", count);
+	fprintf(stderr, "Have %d cells\n", count);
 	
 	cellIDs = malloc(count * sizeof(int));
 	cells = malloc(count * sizeof(struct evd5_status_t));
