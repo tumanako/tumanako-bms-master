@@ -231,21 +231,24 @@ char _getCellState(int cellID, struct evd5_status_t* status, int maxAttempts) {
 
 void setShuntCurrent() {
 	for (int i = 0; i < cellCount; i++) {
+		unsigned short target;
 		if (cells[i].vCell > SHUNT_ON_VOLTAGE) {
-			// TODO should we shunt on the difference between cell and the average
-			// rather than the difference between the cell and some absolute?
-			short difference = cells[i].vCell - SHUNT_ON_VOLTAGE;
-			unsigned short target = (difference / 25) * 50 + 50;
-			if (cells[i].vCell - avgVoltage() < 20) {
+			short difference = cells[i].vCell - minVoltage();
+			if (difference < 20) {
 				target = 0;
+			} else {
+				target = (difference / 20) * 50 + 50;
 			}
 			if (target > SHUNT_MAX_CURRENT) {
 				target = SHUNT_MAX_CURRENT;
+			} else if (target > 0 && target < 150) {
+				// TODO the slaves don't respond to shunt demands less than 150 :(
+				target = 150;
 			}
-			setMinCurrent(i, target);
 		} else {
-			setMinCurrent(i, 0);
+			target = 0;
 		}
+		setMinCurrent(i, target);
 	}
 }
 
