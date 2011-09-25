@@ -56,9 +56,8 @@ int *cellIDs;
 int cellCount;
 
 char chargerState = 0;
-int main()
-{
-    struct termios oldtio,newtio;
+int main() {
+	struct termios oldtio, newtio;
 
 	if (chargercontrol_init()) {
 		return 1;
@@ -69,29 +68,29 @@ int main()
 	}
 
 	buscontrol_setBus(TRUE);
-    fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY );
-    if (fd <0) {
-        perror(MODEMDEVICE);
-        return -1;
-    }
+	fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY);
+	if (fd < 0) {
+		perror(MODEMDEVICE);
+		return -1;
+	}
 
-    tcgetattr(fd,&oldtio); /* save current port settings */
+	tcgetattr(fd, &oldtio); /* save current port settings */
 
-    bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-    newtio.c_iflag = IGNPAR;
-    newtio.c_oflag = 0;
+	bzero(&newtio, sizeof(newtio));
+	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+	newtio.c_iflag = IGNPAR;
+	newtio.c_oflag = 0;
 
-    /* set input mode (non-canonical, no echo,...) */
-    newtio.c_lflag = 0;
+	/* set input mode (non-canonical, no echo,...) */
+	newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 1;
-    newtio.c_cc[VMIN]     = 10;
+	newtio.c_cc[VTIME] = 1;
+	newtio.c_cc[VMIN] = 10;
 
-    tcflush(fd, TCIFLUSH);
-    tcsetattr(fd,TCSANOW,&newtio);
+	tcflush(fd, TCIFLUSH);
+	tcsetattr(fd, TCSANOW, &newtio);
 
-    initCellIDArray();
+	initCellIDArray();
 
 	char seq = '0';
 
@@ -110,14 +109,14 @@ int main()
 	// findCells();
 
 	// clear the screen
-	write(2,"\E[H\E[2J",7);
+	write(2, "\E[H\E[2J", 7);
 
 	chargerState = 0;
 	printf("\n");
 	time_t last = 0;
 	while (1) {
 		// move to the top of the screen
-		write(2,"\E[H",3);
+		write(2, "\E[H", 3);
 		time_t t;
 		time(&t);
 		if (t == last) {
@@ -131,7 +130,12 @@ int main()
 			getCellState(i);
 			printf("%5d %5d ", cells[i].vCell, cells[i].iShunt);
 			struct evd5_status_t *status = &cells[i];
-			fprintf(stderr, "%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x ", i, cellIDs[i], status->vCell, status->vShunt, status->iShunt, status->minCurrent, status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc);
+			fprintf(
+					stderr,
+					"%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x ",
+					i, cellIDs[i], status->vCell, status->vShunt, status->iShunt, status->minCurrent,
+					status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing,
+					status->automatic, status->sequenceNumber, status->crc);
 			unsigned char tens = (status->vCell / 10) % 10;
 			unsigned char hundreds = (status->vCell / 100) % 10;
 			for (int j = 0; j < hundreds; j++) {
@@ -140,7 +144,7 @@ int main()
 			for (int j = 0; j < tens; j++) {
 				fprintf(stderr, "-");
 			}
-			write(2,"\E[K",3);
+			write(2, "\E[K", 3);
 			fprintf(stderr, "\n");
 			fflush(NULL);
 		}
@@ -148,16 +152,17 @@ int main()
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
- 		} if (maxVoltage() < CHARGER_ON_VOLTAGE || chargerState) {
+		}
+		if (maxVoltage() < CHARGER_ON_VOLTAGE || chargerState) {
 			chargercontrol_setCharger(TRUE);
 			chargerState = 1;
 		}
-		fprintf(stderr, "%d@%02d %d %d@%02d %d %f %s\n", minVoltage(), minVoltageCell(), avgVoltage(), maxVoltage(), maxVoltageCell(), 
-				totalVoltage(), chargercontrol_getChargeCurrent(), chargerState ? "on" : "off");
+		fprintf(stderr, "%d@%02d %d %d@%02d %d %f %s\n", minVoltage(), minVoltageCell(), avgVoltage(), maxVoltage(),
+				maxVoltageCell(), totalVoltage(), chargercontrol_getChargeCurrent(), chargerState ? "on" : "off");
 		setShuntCurrent();
 		fflush(NULL);
 	}
-    	tcsetattr(fd,TCSANOW,&oldtio);
+	tcsetattr(fd, TCSANOW, &oldtio);
 }
 
 unsigned char sequenceNumber = 0;
@@ -218,7 +223,8 @@ char _getCellState(int cellID, struct evd5_status_t* status, int maxAttempts) {
 			continue;
 		}
 		if (status->sequenceNumber != sentSequenceNumber) {
-			fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellID, sentSequenceNumber, status->sequenceNumber);
+			fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02x\n", cellID,
+					sentSequenceNumber, status->sequenceNumber);
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
@@ -254,7 +260,7 @@ void setMinCurrent(int cellIndex, unsigned short minCurrent) {
 	char command;
 	unsigned char buf[255];
 	if (minCurrent > SHUNT_MAX_CURRENT) {
-			minCurrent = SHUNT_MAX_CURRENT;
+		minCurrent = SHUNT_MAX_CURRENT;
 	}
 	int actual = SHUNT_MAX_CURRENT + 1;
 	for (int i = 0; i < 20; i++) {
@@ -273,7 +279,8 @@ void setMinCurrent(int cellIndex, unsigned short minCurrent) {
 	}
 	// couldn't get to desired current after 10 attempts???
 	chargercontrol_shutdown();
-	fprintf(stderr, "%2d trying to get to %d but had %d actual = %d\n", cellIDs[cellIndex], minCurrent, cells[cellIndex].minCurrent, actual);
+	fprintf(stderr, "%2d trying to get to %d but had %d actual = %d\n", cellIDs[cellIndex], minCurrent,
+			cells[cellIndex].minCurrent, actual);
 	exit(1);
 }
 
@@ -357,7 +364,7 @@ void writeSlowly(int fd, char *s, int length) {
 int readEnough(int fd, unsigned char *buf, int length) {
 	fd_set rfds;
 	struct timeval tv;
-	
+
 	FD_ZERO(&rfds);
 	FD_SET(fd, &rfds);
 
@@ -367,7 +374,7 @@ int readEnough(int fd, unsigned char *buf, int length) {
 	int actual = 0;
 	for (int i = 0; i < 5; i++) {
 		int retval = select(fd + 1, &rfds, NULL, NULL, &tv);
-		if (retval == -1) {	
+		if (retval == -1) {
 			fflush(NULL);
 			return actual;
 		}
@@ -394,7 +401,7 @@ int readEnough(int fd, unsigned char *buf, int length) {
 void dumpBuffer(unsigned char *buf, int length) {
 	if (DEBUG) {
 		for (int i = 0; i < length; i++) {
-			fprintf(stderr, "%d %x\n", i,  buf[i]);
+			fprintf(stderr, "%d %x\n", i, buf[i]);
 		}
 	}
 }
@@ -408,11 +415,11 @@ void initCellIDArray() {
 	}
 	fclose(in);
 	fprintf(stderr, "Have %d cells\n", count);
-	
+
 	cellIDs = malloc(count * sizeof(int));
 	cells = malloc(count * sizeof(struct evd5_status_t));
 	cellCount = count;
-	
+
 	count = 0;
 	in = fopen(CELL_ID_FILE, "r");
 	while (EOF != fscanf(in, "%d\n", &id)) {

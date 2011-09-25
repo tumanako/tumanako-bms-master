@@ -40,9 +40,8 @@ typedef uint16_t crc_t;
  *
  * \return     The initial crc value.
  *****************************************************************************/
-static inline crc_t crc_init(void)
-{
-    return 0xffff;
+static inline crc_t crc_init(void) {
+	return 0xffff;
 }
 
 /**
@@ -61,14 +60,12 @@ crc_t crc_update(crc_t crc, const unsigned char *data, size_t data_len);
  * \param crc  The current crc value.
  * \return     The final crc value.
  *****************************************************************************/
-static inline crc_t crc_finalize(crc_t crc)
-{
-    return crc ^ 0x0000;
+static inline crc_t crc_finalize(crc_t crc) {
+	return crc ^ 0x0000;
 }
 
-
 #ifdef __cplusplus
-}           /* closing brace for extern "C" */
+} /* closing brace for extern "C" */
 #endif
 
 #endif      /* __CRC_H__ */

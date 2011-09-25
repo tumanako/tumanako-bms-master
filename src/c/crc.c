@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-
 /**
  * Update the crc value with new data.
  *
@@ -27,27 +26,25 @@
  * \param data_len Number of bytes in the \a data buffer.
  * \return         The updated crc value.
  *****************************************************************************/
-crc_t crc_update(crc_t crc, const unsigned char *data, size_t data_len)
-{
-    unsigned int i;
-    bool bit;
-    unsigned char c;
+crc_t crc_update(crc_t crc, const unsigned char *data, size_t data_len) {
+	unsigned int i;
+	bool bit;
+	unsigned char c;
 
-    while (data_len--) {
-        c = *data++;
-        for (i = 0x80; i > 0; i >>= 1) {
-            bit = crc & 0x8000;
-            if (c & i) {
-                bit = !bit;
-            }
-            crc <<= 1;
-            if (bit) {
-                crc ^= 0x1021;
-            }
-        }
-        crc &= 0xffff;
-    }
-    return crc & 0xffff;
+	while (data_len--) {
+		c = *data++;
+		for (i = 0x80; i > 0; i >>= 1) {
+			bit = crc & 0x8000;
+			if (c & i) {
+				bit = !bit;
+			}
+			crc <<= 1;
+			if (bit) {
+				crc ^= 0x1021;
+			}
+		}
+		crc &= 0xffff;
+	}
+	return crc & 0xffff;
 }
-
 
