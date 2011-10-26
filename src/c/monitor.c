@@ -114,6 +114,7 @@ int main() {
 	chargerState = 0;
 	printf("\n");
 	time_t last = 0;
+	char shutdown = 0;
 	while (1) {
 		// move to the top of the screen
 		write(2, "\E[H", 3);
@@ -152,10 +153,13 @@ int main() {
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
+			shutdown = 1;
 		}
 		if (maxVoltage() < CHARGER_ON_VOLTAGE || chargerState) {
-			chargercontrol_setCharger(TRUE);
-			chargerState = 1;
+			if (!shutdown) {
+				chargercontrol_setCharger(TRUE);
+				chargerState = 1;
+			}
 		}
 		fprintf(stderr, "%d@%02d %d %d@%02d %d %f %s\n", minVoltage(), minVoltageCell(), avgVoltage(), maxVoltage(),
 				maxVoltageCell(), totalVoltage(), chargercontrol_getChargeCurrent(), chargerState ? "on" : "off");
