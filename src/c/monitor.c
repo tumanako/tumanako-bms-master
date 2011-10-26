@@ -300,7 +300,7 @@ int minVoltageCell() {
 	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell < min) {
 			min = cells[i].vCell;
-			result = cellIDs[i];
+			result = i;
 		}
 	}
 	return result;
@@ -322,7 +322,7 @@ int maxVoltageCell() {
 	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell > max) {
 			max = cells[i].vCell;
-			result = cellIDs[i];
+			result = i;
 		}
 	}
 	return result;
