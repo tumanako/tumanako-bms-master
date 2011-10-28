@@ -443,7 +443,7 @@ void initCellIDArray() {
 void findCells() {
 	struct evd5_status_t status;
 	for (int i = 0; i < 255; i++) {
-		_getCellState(i, &status, 1);
+		_getCellState(0, i, &status, 1);
 		if (status.cellAddress == i) {
 			printf("found cell at %d\n", i);
 		} else {
