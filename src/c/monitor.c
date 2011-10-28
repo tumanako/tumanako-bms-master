@@ -17,7 +17,7 @@
 #include "buscontrol.h"
 
 #define BAUDRATE B9600
-#define MODEMDEVICE "/dev/ttyS0"
+#define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
@@ -34,6 +34,7 @@
 
 void initCellIDArray();
 void sendCommand(int address, char sequenceNumber, char command);
+void getCellStates(char log);
 void getCellState(int cellIndex);
 char _getCellState(int cellID, struct evd5_status_t* status, int attempts);
 void writeSlowly(int fd, char *s, int length);
@@ -126,29 +127,7 @@ int main() {
 		}
 		last = t;
 		printf("%d ", (int) t);
-		printf("%lf ", chargercontrol_getChargeCurrent());
-		for (int i = 0; i < cellCount; i++) {
-			getCellState(i);
-			printf("%5d %5d ", cells[i].vCell, cells[i].iShunt);
-			struct evd5_status_t *status = &cells[i];
-			fprintf(
-					stderr,
-					"%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x ",
-					i, cellIDs[i], status->vCell, status->vShunt, status->iShunt, status->minCurrent,
-					status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing,
-					status->automatic, status->sequenceNumber, status->crc);
-			unsigned char tens = (status->vCell / 10) % 10;
-			unsigned char hundreds = (status->vCell / 100) % 10;
-			for (int j = 0; j < hundreds; j++) {
-				fprintf(stderr, "*");
-			}
-			for (int j = 0; j < tens; j++) {
-				fprintf(stderr, "-");
-			}
-			write(2, "\E[K", 3);
-			fprintf(stderr, "\n");
-			fflush(NULL);
-		}
+		getCellStates(1);
 		printf("\n");
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
 			chargercontrol_setCharger(FALSE);
@@ -167,6 +146,35 @@ int main() {
 		fflush(NULL);
 	}
 	tcsetattr(fd, TCSANOW, &oldtio);
+}
+
+void getCellStates(char log) {
+	for (int i = 0; i < cellCount; i++) {
+		getCellState(i);
+		if (log) {
+			printf("%d %d ", cells[i].vCell, cells[i].iShunt);
+		}
+		struct evd5_status_t *status = &cells[i];
+		fprintf(
+				stderr,
+				"%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x ",
+				i, cellIDs[i], status->vCell, status->vShunt, status->iShunt, status->minCurrent, status->temperature,
+				status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic,
+				status->sequenceNumber, status->crc);
+		unsigned char tens = (status->vCell / 10) % 10;
+		unsigned char hundreds = (status->vCell / 100) % 10;
+		for (int j = 0; j < hundreds; j++) {
+			for (int k = 0; k < 10; k++) {
+				fprintf(stderr, "*");
+			}
+		}
+		for (int j = 0; j < tens; j++) {
+			fprintf(stderr, "-");
+		}
+		write(2, "\E[K", 3);
+		fprintf(stderr, "\n");
+		fflush(NULL);
+	}
 }
 
 unsigned char sequenceNumber = 0;
