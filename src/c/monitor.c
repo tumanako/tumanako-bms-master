@@ -36,7 +36,7 @@ void initCellIDArray();
 void sendCommand(int address, char sequenceNumber, char command);
 void getCellStates(char log);
 void getCellState(int cellIndex);
-char _getCellState(int cellID, struct evd5_status_t* status, int attempts);
+char _getCellState(int cellIndex, int cellID, struct evd5_status_t* status, int attempts);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, unsigned char *buf, int length);
 int maxVoltage();
@@ -180,15 +180,15 @@ void getCellStates(char log) {
 unsigned char sequenceNumber = 0;
 
 void getCellState(int cellIndex) {
-	char success = _getCellState(cellIDs[cellIndex], &cells[cellIndex], 4);
+	char success = _getCellState(cellIndex, cellIDs[cellIndex], &cells[cellIndex], 4);
 	if (!success) {
-		printf("bus errors, exiting\n");
+		printf("bus errors talking to cell %d (id %d), exiting\n", cellIndex, cellIDs[cellIndex]);
 		chargercontrol_shutdown();
 		exit(1);
 	}
 }
 
-char _getCellState(int cellID, struct evd5_status_t* status, int maxAttempts) {
+char _getCellState(int cellIndex, int cellID, struct evd5_status_t* status, int maxAttempts) {
 	int actualLength = 0;
 	for (int attempt = 0; TRUE; attempt++) {
 		if (attempt >= maxAttempts) {
@@ -198,7 +198,7 @@ char _getCellState(int cellID, struct evd5_status_t* status, int maxAttempts) {
 			exit(1);
 		}
 		if (attempt > 0 && actualLength == 0) {
-			fprintf(stderr, "no response, resetting\n");
+			fprintf(stderr, "no response from %d (id %d), resetting\n", cellIndex, cellID);
 			buscontrol_setBus(FALSE);
 			sleep(1);
 			buscontrol_setBus(TRUE);
