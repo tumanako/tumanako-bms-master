@@ -15,6 +15,7 @@
 #include "crc.h"
 #include "chargercontrol.h"
 #include "buscontrol.h"
+#include "soc.h"
 
 #define BAUDRATE B9600
 #define MODEMDEVICE "/dev/ttyS1"
@@ -65,6 +66,10 @@ int main() {
 	}
 
 	if (buscontrol_init()) {
+		return 1;
+	}
+
+	if (soc_init()) {
 		return 1;
 	}
 
@@ -127,6 +132,8 @@ int main() {
 		}
 		last = t;
 		printf("%d ", (int) t);
+		printf("%lf ", soc_getCurrent());
+		printf("%lf ", soc_getAh());
 		getCellStates(1);
 		printf("\n");
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
@@ -140,8 +147,13 @@ int main() {
 				chargerState = 1;
 			}
 		}
-		fprintf(stderr, "%d@%02d %d %d@%02d %d %f %s\n", minVoltage(), minVoltageCell(), avgVoltage(), maxVoltage(),
-				maxVoltageCell(), totalVoltage(), chargercontrol_getChargeCurrent(), chargerState ? "on" : "off");
+		if (soc_getError()) {
+			fprintf(stderr, "State of Charge error?");
+			chargercontrol_shutdown();
+			shutdown = 1;
+		}
+		fprintf(stderr, "%d@%02d %d %d@%02d %d %0.2lfV %0.2lfA %0.2lfAh %s\n", minVoltage(), minVoltageCell(), avgVoltage(), maxVoltage(),
+				maxVoltageCell(), totalVoltage(), soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
 		setShuntCurrent();
 		fflush(NULL);
 	}
