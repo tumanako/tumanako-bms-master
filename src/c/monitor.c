@@ -55,21 +55,21 @@ struct status_t {
 };
 
 void initCellIDArray();
-void sendCommand(int address, char sequenceNumber, char command);
+void sendCommand(unsigned short address, char sequenceNumber, char command);
 void getCellStates(char log);
-void getCellState(int cellIndex);
-char _getCellState(int cellIndex, struct status_t *status, int attempts);
+void getCellState(unsigned short cellIndex);
+char _getCellState(unsigned short cellIndex, struct status_t *status, int attempts);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, unsigned char *buf, int length);
-int maxVoltage();
-int maxVoltageCell();
-int minVoltage();
-int minVoltageCell();
-int avgVoltage();
-int totalVoltage();
+unsigned short maxVoltage();
+unsigned short maxVoltageCell();
+unsigned short minVoltage();
+unsigned short minVoltageCell();
+unsigned short avgVoltage();
+unsigned int totalVoltage();
 void setShuntCurrent();
-void setMinCurrent(int cellIndex, unsigned short minCurrent);
-void dumpBuffer(unsigned char * buf, int length);
+void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent);
+void dumpBuffer(unsigned char *buf, int length);
 void findCells();
 void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
 
@@ -153,8 +153,8 @@ int main() {
 		}
 		last = t;
 		printf("%d ", (int) t);
-		printf("%lf ", soc_getCurrent());
-		printf("%lf ", soc_getAh());
+		printf("%5.1f ", soc_getCurrent());
+		printf("%5.2f ", soc_getAh());
 		getCellStates(1);
 		printf("\n");
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
@@ -173,7 +173,7 @@ int main() {
 			chargercontrol_shutdown();
 			shutdown = 1;
 		}
-		fprintf(stderr, "%d@%02d %d %d@%02d %d %0.2lfV %0.2lfA %0.2lfAh %s\n", minVoltage(), minVoltageCell(),
+		fprintf(stderr, "%d@%02d %d %d@%02d %dV %6.2fV %7.2fA %7.2fAh %s\n", minVoltage(), minVoltageCell(),
 				avgVoltage(), maxVoltage(), maxVoltageCell(), totalVoltage(), soc_getVoltage(), soc_getCurrent(),
 				soc_getAh(), chargerState ? "on" : "off");
 		setShuntCurrent();
@@ -213,7 +213,7 @@ void getCellStates(char log) {
 
 unsigned char sequenceNumber = 0;
 
-void getCellState(int cellIndex) {
+void getCellState(unsigned short cellIndex) {
 	char success = _getCellState(cellIndex, &cells[cellIndex], 4);
 	if (!success) {
 		printf("bus errors talking to cell %d (id %d), exiting\n", cellIndex, cells[cellIndex].cellId);
@@ -222,12 +222,12 @@ void getCellState(int cellIndex) {
 	}
 }
 
-char _getCellState(int cellIndex, struct status_t* status, int maxAttempts) {
+char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAttempts) {
 	int actualLength = 0;
 	for (int attempt = 0; TRUE; attempt++) {
 		if (attempt >= maxAttempts) {
 			return 0;
-			printf("%d bus errors, exiting\n", attempt);
+			fprintf(stderr, "%d bus errors, exiting\n", attempt);
 			chargercontrol_shutdown();
 			exit(1);
 		}
@@ -256,8 +256,8 @@ char _getCellState(int cellIndex, struct status_t* status, int maxAttempts) {
 		expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
 		expectedCRC = crc_finalize(expectedCRC);
 		if (expectedCRC != *actualCRC) {
-			fprintf(stderr, "\nSent message to %2d expected CRC 0x%04x got 0x%04x\n", cells[cellIndex].cellId,
-					expectedCRC, *actualCRC);
+			fprintf(stderr, "\nSent message to %2d (id %2d) expected CRC 0x%04x got 0x%04x\n", cellIndex,
+					cells[cellIndex].cellId, expectedCRC, *actualCRC);
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
@@ -266,14 +266,14 @@ char _getCellState(int cellIndex, struct status_t* status, int maxAttempts) {
 		// have to copy this one separately because of padding
 		evd5Status.crc = *actualCRC;
 		if (evd5Status.cellAddress != status->cellId) {
-			fprintf(stderr, "\nSent message to %2d but recieved response from %x\n", status->cellId,
+			fprintf(stderr, "\nSent message to %2d (id %2d) but recieved response from %x\n", cellIndex, status->cellId,
 					evd5Status.cellAddress);
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
 		if (evd5Status.sequenceNumber != sentSequenceNumber) {
-			fprintf(stderr, "\nSent message to %2d with seq 0x%02x but recieved seq 0x%02hhx\n", status->cellId,
-					sentSequenceNumber, evd5Status.sequenceNumber);
+			fprintf(stderr, "\nSent message to %2d (id %2d) with seq 0x%02x but received seq 0x%02hhx\n", cellIndex,
+					status->cellId, sentSequenceNumber, evd5Status.sequenceNumber);
 			dumpBuffer(buf, actualLength);
 			continue;
 		}
@@ -321,7 +321,7 @@ void setShuntCurrent() {
 	}
 }
 
-void setMinCurrent(int cellIndex, unsigned short minCurrent) {
+void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 	char command;
 	unsigned char buf[255];
 	if (minCurrent > SHUNT_MAX_CURRENT) {
@@ -340,17 +340,17 @@ void setMinCurrent(int cellIndex, unsigned short minCurrent) {
 		readEnough(fd, buf, 5);
 		buf[6] = 0;
 		char *endPtr;
-		actual = strtol(buf, &endPtr, 10);
+		actual = strtol((char *) buf, &endPtr, 10);
 	}
 	// couldn't get to desired current after 10 attempts???
 	chargercontrol_shutdown();
 	getCellState(cellIndex);
-	fprintf(stderr, "%2d trying to get to %d but had %d actual = %d\n", cells[cellIndex].cellId, minCurrent,
+	fprintf(stderr, "%2d (id %2d) trying to get to %d but had %d actual = %d\n", cellIndex, cells[cellIndex].cellId, minCurrent,
 			cells[cellIndex].minCurrent, actual);
 	exit(1);
 }
 
-int minVoltage() {
+unsigned short minVoltage() {
 	int result = 999999;
 	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell < result) {
@@ -360,7 +360,7 @@ int minVoltage() {
 	return result;
 }
 
-int minVoltageCell() {
+unsigned short minVoltageCell() {
 	int min = 999999;
 	int result = 0;
 	for (int i = 0; i < cellCount; i++) {
@@ -372,8 +372,8 @@ int minVoltageCell() {
 	return result;
 }
 
-int maxVoltage() {
-	int result = 0;
+unsigned short maxVoltage() {
+	unsigned result = 0;
 	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell > result) {
 			result = cells[i].vCell;
@@ -382,9 +382,9 @@ int maxVoltage() {
 	return result;
 }
 
-int maxVoltageCell() {
+unsigned short maxVoltageCell() {
 	int max = 0;
-	int result = 0;
+	unsigned short result = 0;
 	for (int i = 0; i < cellCount; i++) {
 		if (cells[i].vCell > max) {
 			max = cells[i].vCell;
@@ -394,7 +394,7 @@ int maxVoltageCell() {
 	return result;
 }
 
-int totalVoltage() {
+unsigned int totalVoltage() {
 	int result = 0;
 	for (int i = 0; i < cellCount; i++) {
 		result += cells[i].vCell;
@@ -402,11 +402,11 @@ int totalVoltage() {
 	return result;
 }
 
-int avgVoltage() {
+unsigned short avgVoltage() {
 	return totalVoltage() / cellCount;
 }
 
-void sendCommand(int address, char sequence, char command) {
+void sendCommand(unsigned short address, char sequence, char command) {
 	char buf[] = "heloXXYX";
 	// little endian
 	buf[4] = (char) address & 0x00FF;
@@ -473,10 +473,10 @@ void dumpBuffer(unsigned char *buf, int length) {
 }
 
 void initCellIDArray() {
-	int id;
+	unsigned short id;
 	int count = 0;
 	FILE *in = fopen(CELL_ID_FILE, "r");
-	while (EOF != fscanf(in, "%d\n", &id)) {
+	while (EOF != fscanf(in, "%hd\n", &id)) {
 		count++;
 	}
 	fclose(in);
@@ -487,7 +487,7 @@ void initCellIDArray() {
 
 	count = 0;
 	in = fopen(CELL_ID_FILE, "r");
-	while (EOF != fscanf(in, "%d\n", &id)) {
+	while (EOF != fscanf(in, "%hd\n", &id)) {
 		cells[count++].cellId = id;
 	}
 	fclose(in);
