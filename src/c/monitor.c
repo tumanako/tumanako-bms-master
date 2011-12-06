@@ -286,7 +286,7 @@ void setShuntCurrent() {
 		unsigned short target;
 		if (cells[i].vCell > SHUNT_ON_VOLTAGE) {
 			short difference = cells[i].vCell - minVoltage();
-			if (difference < 20) {
+			if (difference < 50) {
 				target = 0;
 			} else {
 				target = (difference / 20) * 50 + 50;
