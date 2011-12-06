@@ -473,8 +473,15 @@ void printCellDetail(unsigned short cellIndex, struct status_t *status) {
 			cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
 			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
 			status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc);
-	unsigned char tens = (status->vCell / 10) % 10;
-	unsigned char hundreds = (status->vCell / 100) % 10;
+	unsigned char tens;
+	unsigned char hundreds;
+	if (status->vCell < 3000) {
+		tens = 0;
+		hundreds = 0;
+	} else {
+		tens = (status->vCell / 10) % 10;
+		hundreds = (status->vCell / 100) % 10;
+	}
 	for (int j = 0; j < hundreds; j++) {
 		for (int k = 0; k < 10; k++) {
 			fprintf(stderr, "*");
