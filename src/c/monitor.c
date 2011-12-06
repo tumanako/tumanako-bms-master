@@ -154,8 +154,8 @@ int main() {
 		}
 		last = t;
 		printf("%d ", (int) t);
-		printf("%5.1f ", soc_getCurrent());
-		printf("%5.2f ", soc_getAh());
+		printf("%.1f ", soc_getCurrent());
+		printf("%.2f ", soc_getAh());
 		getCellStates(1);
 		printf("\n");
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
