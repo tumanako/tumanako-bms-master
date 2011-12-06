@@ -72,6 +72,9 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
 void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
+void printSummary();
+void printCellDetail(unsigned short cellIndex, struct status_t *status);
+double asDouble(int s);
 
 int fd;
 
@@ -143,8 +146,6 @@ int main() {
 	time_t last = 0;
 	char shutdown = 0;
 	while (1) {
-		// move to the top of the screen
-		write(2, "\E[H", 3);
 		time_t t;
 		time(&t);
 		if (t == last) {
@@ -173,9 +174,7 @@ int main() {
 			chargercontrol_shutdown();
 			shutdown = 1;
 		}
-		fprintf(stderr, "%d@%02d %d %d@%02d %dV %6.2fV %7.2fA %7.2fAh %s\n", minVoltage(), minVoltageCell(),
-				avgVoltage(), maxVoltage(), maxVoltageCell(), totalVoltage(), soc_getVoltage(), soc_getCurrent(),
-				soc_getAh(), chargerState ? "on" : "off");
+		printSummary();
 		setShuntCurrent();
 		fflush(NULL);
 	}
@@ -183,31 +182,15 @@ int main() {
 }
 
 void getCellStates(char log) {
+	// move to the top of the screen
+	write(2, "\E[H", 3);
 	for (int i = 0; i < cellCount; i++) {
 		getCellState(i);
 		if (log) {
-			printf("%d %d ", cells[i].vCell, cells[i].iShunt);
+			printf("%.3f %.3f ", asDouble(cells[i].vCell), asDouble(cells[i].iShunt));
 		}
 		struct status_t *status = &cells[i];
-		fprintf(
-				stderr,
-				"%02d %02d Vc=%04d Vs=%04d Is=%04d It=%03d Q=? Vt=%05d Vg=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02x crc=%04x ",
-				i, status->cellId, status->vCell, status->vShunt, status->iShunt, status->minCurrent,
-				status->temperature, status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing,
-				status->automatic, status->sequenceNumber, status->crc);
-		unsigned char tens = (status->vCell / 10) % 10;
-		unsigned char hundreds = (status->vCell / 100) % 10;
-		for (int j = 0; j < hundreds; j++) {
-			for (int k = 0; k < 10; k++) {
-				fprintf(stderr, "*");
-			}
-		}
-		for (int j = 0; j < tens; j++) {
-			fprintf(stderr, "-");
-		}
-		write(2, "\E[K", 3);
-		fprintf(stderr, "\n");
-		fflush(NULL);
+		printCellDetail(i, status);
 	}
 }
 
@@ -470,6 +453,44 @@ void dumpBuffer(unsigned char *buf, int length) {
 			fprintf(stderr, "%d %x\n", i, buf[i]);
 		}
 	}
+}
+
+void printSummary() {
+	fprintf(stderr, "%.3f@%02d %.3f %.3f@%02d %6.3fV %6.2fV %7.2fA %7.2fAh %s\n", asDouble(minVoltage()),
+			minVoltageCell(), asDouble(avgVoltage()), asDouble(maxVoltage()), maxVoltageCell(),
+			asDouble(totalVoltage()), soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
+}
+
+void printCellDetail(unsigned short cellIndex, struct status_t *status) {
+	if (status->minCurrent > 0) {
+		write(2, "\E[31m", 5);
+	} else {
+		write(2, "\E[m", 3);
+	}
+	fprintf(
+			stderr,
+			"%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02hhx crc=%04hx ",
+			cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
+			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
+			status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc);
+	unsigned char tens = (status->vCell / 10) % 10;
+	unsigned char hundreds = (status->vCell / 100) % 10;
+	for (int j = 0; j < hundreds; j++) {
+		for (int k = 0; k < 10; k++) {
+			fprintf(stderr, "*");
+		}
+	}
+	for (int j = 0; j < tens; j++) {
+		fprintf(stderr, "-");
+	}
+	write(2, "\E[K", 3);
+	fprintf(stderr, "\n");
+	fflush(NULL);
+
+}
+
+double asDouble(int s) {
+	return ((double) s) / 1000;
 }
 
 void initCellIDArray() {
