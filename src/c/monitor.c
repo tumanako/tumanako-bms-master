@@ -25,6 +25,7 @@
 
 #define CELL_ID_FILE "cells.txt"
 #define DEBUG 0
+#define HAS_KELVIN_CONNECTION 0
 #define CHARGER_RELAY_PORT 7
 #define CHARGER_ON_VOLTAGE 3550
 #define CHARGER_OFF_VOLTAGE 3650
@@ -52,6 +53,8 @@ struct status_t {
 	// true if we are controlling the shunt current automatically
 	unsigned char automatic;
 	unsigned short crc;
+	// target current (what we last sent to the cell)
+	unsigned short targetShuntCurrent;
 };
 
 void initCellIDArray();
@@ -75,6 +78,8 @@ void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
 void printSummary();
 void printCellDetail(unsigned short cellIndex, struct status_t *status);
 double asDouble(int s);
+void turnOffAllShunts();
+char isAnyCellShunting();
 
 int fd;
 
@@ -156,6 +161,9 @@ int main() {
 		printf("%d ", (int) t);
 		printf("%.1f ", soc_getCurrent());
 		printf("%.2f ", soc_getAh());
+		if (!HAS_KELVIN_CONNECTION) {
+			turnOffAllShunts();
+		}
 		getCellStates(1);
 		printf("\n");
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
@@ -177,6 +185,18 @@ int main() {
 		printSummary();
 		setShuntCurrent();
 		fflush(NULL);
+
+		// If we don't have a kelvin connection then we will be turning off the shunts to read the voltages.
+		// This causes problems because the cells are quite slow to turn on the shunts. Here we read the
+		// shunt current a few times without turning off the shunts to let them have time to do their work
+		//
+		// TODO implement "suspend" command to tell slaves to stop shunting and store their shunt config for
+		// later fast re-enabling
+		for (int j = 0; !HAS_KELVIN_CONNECTION && isAnyCellShunting() && j < 5; j++) {
+			// 10 second delay could be shortened
+			sleep(10);
+			getCellStates(0);
+		}
 	}
 	tcsetattr(fd, TCSANOW, &oldtio);
 }
@@ -281,6 +301,21 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 	to->crc = from->crc;
 }
 
+/** turn shunting off on any cells that are shunting */
+void turnOffAllShunts() {
+	char changed = 0;
+	for (int i = 0; i < cellCount; i++) {
+		if (cells[i].minCurrent != 0) {
+			setMinCurrent(i, 0);
+			changed = 1;
+		}
+	}
+	if (changed) {
+		// give slaves time to process
+		sleep(2);
+	}
+}
+
 void setShuntCurrent() {
 	for (int i = 0; i < cellCount; i++) {
 		unsigned short target;
@@ -310,6 +345,7 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 	if (minCurrent > SHUNT_MAX_CURRENT) {
 		minCurrent = SHUNT_MAX_CURRENT;
 	}
+	cells[cellIndex].targetShuntCurrent = minCurrent;
 	int actual = SHUNT_MAX_CURRENT + 1;
 	for (int i = 0; i < 20; i++) {
 		if (actual > minCurrent) {
@@ -387,6 +423,18 @@ unsigned int totalVoltage() {
 
 unsigned short avgVoltage() {
 	return totalVoltage() / cellCount;
+}
+
+/**
+ * @return true if any cell is shunting
+ */
+char isAnyCellShunting() {
+	for (int j = 0; j < cellCount; j++) {
+		if (cells[j].targetShuntCurrent > 0) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 void sendCommand(unsigned short address, char sequence, char command) {
