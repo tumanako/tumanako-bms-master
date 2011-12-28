@@ -364,8 +364,8 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 	// couldn't get to desired current after 10 attempts???
 	chargercontrol_shutdown();
 	getCellState(cellIndex);
-	fprintf(stderr, "%2d (id %2d) trying to get to %d but had %d actual = %d\n", cellIndex, cells[cellIndex].cellId, minCurrent,
-			cells[cellIndex].minCurrent, actual);
+	fprintf(stderr, "%2d (id %2d) trying to get to %d but had %d actual = %d\n", cellIndex, cells[cellIndex].cellId,
+			minCurrent, cells[cellIndex].minCurrent, actual);
 	exit(1);
 }
 
