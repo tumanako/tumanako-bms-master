@@ -35,6 +35,7 @@
 #define CHARGE_CURRENT_OVERSAMPLING 5
 
 struct status_t {
+	unsigned short cellIndex;
 	unsigned short cellId;
 	unsigned short iShunt;
 	unsigned short vCell;
@@ -80,6 +81,7 @@ void printCellDetail(unsigned short cellIndex, struct status_t *status);
 double asDouble(int s);
 void turnOffAllShunts();
 char isAnyCellShunting();
+char isCellShunting(short cellIndex);
 
 int fd;
 
@@ -295,7 +297,9 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 	to->sequenceNumber = from->sequenceNumber;
 	to->softwareAddressing = from->softwareAddressing;
 	to->temperature = from->temperature;
-	to->vCell = from->vCell;
+	if (!isCellShunting(to->cellIndex)) {
+		to->vCell = from->vCell;
+	}
 	to->vShunt = from->vShunt;
 	to->vShuntPot = from->vShuntPot;
 	to->crc = from->crc;
@@ -437,6 +441,27 @@ char isAnyCellShunting() {
 	return 0;
 }
 
+/**
+ * Returns true if the cell at index cellIndex or an adjacent cell is shunting current. This works
+ * even when cells are out of order because each board has it's own end connections and we are careful
+ * not to reorder cells within a board.
+ */
+char isCellShunting(short cellIndex) {
+	if (HAS_KELVIN_CONNECTION) {
+		return 0;
+	}
+	if (cells[cellIndex].targetShuntCurrent != 0) {
+		return 1;
+	}
+	if (cellIndex != 0 && cells[cellIndex - 1].targetShuntCurrent != 0) {
+		return 1;
+	}
+	if (cellIndex + 1 < cellCount && cells[cellIndex + 1].targetShuntCurrent != 0) {
+		return 1;
+	}
+	return 0;
+}
+
 void sendCommand(unsigned short address, char sequence, char command) {
 	char buf[] = "heloXXYX";
 	// little endian
@@ -564,6 +589,7 @@ void initCellIDArray() {
 	count = 0;
 	in = fopen(CELL_ID_FILE, "r");
 	while (EOF != fscanf(in, "%hd\n", &id)) {
+		cells[count].cellIndex = count;
 		cells[count++].cellId = id;
 	}
 	fclose(in);
