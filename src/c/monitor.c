@@ -195,8 +195,7 @@ int main() {
 		// TODO implement "suspend" command to tell slaves to stop shunting and store their shunt config for
 		// later fast re-enabling
 		for (int j = 0; !HAS_KELVIN_CONNECTION && isAnyCellShunting() && j < 5; j++) {
-			// 10 second delay could be shortened
-			sleep(10);
+			sleep(2);
 			getCellStates(0);
 		}
 	}
