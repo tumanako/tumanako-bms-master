@@ -33,6 +33,7 @@
 #define SHUNT_MAX_CURRENT 500
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
 #define CHARGE_CURRENT_OVERSAMPLING 5
+#define LOOP_DELAY 10
 
 struct status_t {
 	unsigned short cellIndex;
@@ -155,8 +156,8 @@ int main() {
 	while (1) {
 		time_t t;
 		time(&t);
-		if (t == last) {
-			// TODO sleep instead of spinning
+		if (t < last + LOOP_DELAY) {
+			sleep(1);
 			continue;
 		}
 		last = t;
