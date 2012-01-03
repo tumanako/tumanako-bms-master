@@ -11,11 +11,15 @@
 #include <strings.h>
 #include <string.h>
 #include <unistd.h>
+
 #include "../../../slave/src/c/evd5.h"
+
 #include "crc.h"
 #include "chargercontrol.h"
 #include "buscontrol.h"
 #include "soc.h"
+#include "monitor_can.h"
+#include "logger.h"
 
 #define BAUDRATE B9600
 #define MODEMDEVICE "/dev/ttyS1"
@@ -61,7 +65,7 @@ struct status_t {
 
 void initCellIDArray();
 void sendCommand(unsigned short address, char sequenceNumber, char command);
-void getCellStates(char log);
+void getCellStates();
 void getCellState(unsigned short cellIndex);
 char _getCellState(unsigned short cellIndex, struct status_t *status, int attempts);
 void writeSlowly(int fd, char *s, int length);
@@ -102,6 +106,14 @@ int main() {
 	}
 
 	if (soc_init()) {
+		return 1;
+	}
+
+	if (monitorCan_init()) {
+		return 1;
+	}
+	
+	if (logger_init()) {
 		return 1;
 	}
 
@@ -150,7 +162,6 @@ int main() {
 	write(2, "\E[H\E[2J", 7);
 
 	chargerState = 0;
-	printf("\n");
 	time_t last = 0;
 	char shutdown = 0;
 	while (1) {
@@ -161,13 +172,10 @@ int main() {
 			continue;
 		}
 		last = t;
-		printf("%d ", (int) t);
-		printf("%.1f ", soc_getCurrent());
-		printf("%.2f ", soc_getAh());
 		if (!HAS_KELVIN_CONNECTION) {
 			turnOffAllShunts();
 		}
-		getCellStates(1);
+		getCellStates();
 		printf("\n");
 		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
 			chargercontrol_setCharger(FALSE);
@@ -197,20 +205,24 @@ int main() {
 		// later fast re-enabling
 		for (int j = 0; !HAS_KELVIN_CONNECTION && isAnyCellShunting() && j < 5; j++) {
 			sleep(2);
-			getCellStates(0);
+			getCellStates();
 		}
 	}
 	tcsetattr(fd, TCSANOW, &oldtio);
 }
 
-void getCellStates(char log) {
+void getCellStates() {
 	// move to the top of the screen
 	write(2, "\E[H", 3);
 	for (int i = 0; i < cellCount; i++) {
 		getCellState(i);
-		if (log) {
-			printf("%.3f %.3f ", asDouble(cells[i].vCell), asDouble(cells[i].iShunt));
+		if (!isCellShunting(i)) {
+			// the voltage doesn't mean much when we are drawing current
+			montiorCan_sendCellVoltage(i, cells[i].vCell);
 		}
+		monitorCan_sendShuntCurrent(i, cells[i].iShunt);
+		monitorCan_sendMinCurrent(i, cells[i].minCurrent);
+		monitorCan_sendTemperature(i, cells[i].temperature);
 		struct status_t *status = &cells[i];
 		printCellDetail(i, status);
 	}
@@ -309,7 +321,8 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 void turnOffAllShunts() {
 	char changed = 0;
 	for (int i = 0; i < cellCount; i++) {
-		if (cells[i].minCurrent != 0) {
+		struct status_t cell = cells[i];
+		if (cell.minCurrent != 0 || cell.targetShuntCurrent != 0) {
 			setMinCurrent(i, 0);
 			changed = 1;
 		}
