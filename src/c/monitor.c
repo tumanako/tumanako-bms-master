@@ -257,7 +257,7 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 			buscontrol_setBus(TRUE);
 			sleep(1);
 		}
-		unsigned char buf[255];
+		unsigned char buf[EVD5_STATUS_LENGTH];
 		unsigned char sentSequenceNumber;
 		sentSequenceNumber = sequenceNumber++;
 		struct timeval start;
@@ -365,7 +365,7 @@ void setShuntCurrent() {
 
 void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 	char command;
-	unsigned char buf[255];
+	unsigned char buf[7];
 	if (minCurrent > SHUNT_MAX_CURRENT) {
 		minCurrent = SHUNT_MAX_CURRENT;
 	}
@@ -524,8 +524,7 @@ int readEnough(int fd, unsigned char *buf, int length) {
 			fflush(NULL);
 			continue;
 		}
-		actual += read(fd, buf + actual, 255 - actual);
-		buf[actual] = 0;
+		actual += read(fd, buf + actual, length - actual);
 		if (DEBUG) {
 			fprintf(stderr, "read %d expecting %d: ", actual, length);
 			for (int j = 0; j < actual; j++) {
