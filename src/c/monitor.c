@@ -380,7 +380,7 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 			return;
 		}
 		sendCommand(cells[cellIndex].cellId, '0', command);
-		readEnough(fd, buf, 5);
+		readEnough(fd, buf, 7);
 		buf[6] = 0;
 		char *endPtr;
 		actual = strtol((char *) buf, &endPtr, 10);
