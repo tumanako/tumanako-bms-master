@@ -267,10 +267,10 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 		struct timeval end;
 		gettimeofday(&end, NULL);
 		if (actualLength != EVD5_STATUS_LENGTH) {
-			// fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellID);
+			fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, status->cellId);
 			dumpBuffer(buf, actualLength);
 			int secondLength = readEnough(fd, buf, 255);
-			// fprintf(stderr, "read %d more\n", secondLength);
+			fprintf(stderr, "read %d more\n", secondLength);
 			dumpBuffer(buf, secondLength);
 			continue;
 		}
@@ -527,9 +527,9 @@ int readEnough(int fd, unsigned char *buf, int length) {
 		actual += read(fd, buf + actual, 255 - actual);
 		buf[actual] = 0;
 		if (DEBUG) {
-			fprintf(stderr, "read %d expecting %d '%s' ", actual, length, buf);
+			fprintf(stderr, "read %d expecting %d: ", actual, length);
 			for (int j = 0; j < actual; j++) {
-				fprintf(stderr, "%x ", buf[j]);
+				fprintf(stderr, "%02x ", buf[j]);
 			}
 			fprintf(stderr, "\n");
 		}
@@ -543,7 +543,7 @@ int readEnough(int fd, unsigned char *buf, int length) {
 void dumpBuffer(unsigned char *buf, int length) {
 	if (DEBUG) {
 		for (int i = 0; i < length; i++) {
-			fprintf(stderr, "%d %x\n", i, buf[i]);
+			fprintf(stderr, "%02d %02x\n", i, buf[i]);
 		}
 	}
 }
