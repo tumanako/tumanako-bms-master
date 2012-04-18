@@ -61,6 +61,8 @@ struct status_t {
 	unsigned short crc;
 	// target current (what we last sent to the cell)
 	unsigned short targetShuntCurrent;
+	// microseconds required to acquire last reading
+	unsigned long latency;
 };
 
 void initCellIDArray();
@@ -258,8 +260,12 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 		unsigned char buf[255];
 		unsigned char sentSequenceNumber;
 		sentSequenceNumber = sequenceNumber++;
+		struct timeval start;
+		gettimeofday(&start, NULL);
 		sendCommand(status->cellId, sentSequenceNumber, '/');
 		actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
+		struct timeval end;
+		gettimeofday(&end, NULL);
 		if (actualLength != EVD5_STATUS_LENGTH) {
 			// fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, cellID);
 			dumpBuffer(buf, actualLength);
@@ -295,6 +301,7 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 			continue;
 		}
 		evd5ToStatus(&evd5Status, &cells[cellIndex]);
+		cells[cellIndex].latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 		break;
 	}
 	return 1;
@@ -555,10 +562,10 @@ void printCellDetail(unsigned short cellIndex, struct status_t *status) {
 	}
 	fprintf(
 			stderr,
-			"%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02hhx crc=%04hx ",
+			"%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02hhx crc=%04hx %ld ",
 			cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
 			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
-			status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc);
+			status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc, status->latency / 1000);
 	unsigned char tens;
 	unsigned char hundreds;
 	if (status->vCell < 3000) {
