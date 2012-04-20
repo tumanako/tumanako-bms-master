@@ -269,9 +269,7 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 		if (actualLength != EVD5_STATUS_LENGTH) {
 			fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, status->cellId);
 			dumpBuffer(buf, actualLength);
-			int secondLength = readEnough(fd, buf, 255);
-			fprintf(stderr, "read %d more\n", secondLength);
-			dumpBuffer(buf, secondLength);
+			flushInputBuffer();
 			continue;
 		}
 		unsigned short *actualCRC = (unsigned short *) (buf + EVD5_STATUS_LENGTH - sizeof(crc_t));
@@ -282,6 +280,7 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 			fprintf(stderr, "\nSent message to %2d (id %2d) expected CRC 0x%04x got 0x%04x\n", cellIndex,
 					cells[cellIndex].cellId, expectedCRC, *actualCRC);
 			dumpBuffer(buf, actualLength);
+			flushInputBuffer();
 			continue;
 		}
 		struct evd5_status_t evd5Status;
@@ -292,12 +291,14 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 			fprintf(stderr, "\nSent message to %2d (id %2d) but recieved response from %x\n", cellIndex, status->cellId,
 					evd5Status.cellAddress);
 			dumpBuffer(buf, actualLength);
+			flushInputBuffer();
 			continue;
 		}
 		if (evd5Status.sequenceNumber != sentSequenceNumber) {
 			fprintf(stderr, "\nSent message to %2d (id %2d) with seq 0x%02x but received seq 0x%02hhx\n", cellIndex,
 					status->cellId, sentSequenceNumber, evd5Status.sequenceNumber);
 			dumpBuffer(buf, actualLength);
+			flushInputBuffer();
 			continue;
 		}
 		evd5ToStatus(&evd5Status, &cells[cellIndex]);
@@ -537,6 +538,17 @@ int readEnough(int fd, unsigned char *buf, int length) {
 		}
 	}
 	return actual;
+}
+
+/** read all the data in the input buffers, used instead of a start of message byte to re-sync */
+void flushInputBuffer() {
+	unsigned char buf[255];
+	int length = readEnough(fd, buf, 255);
+	do {
+		length = readEnough(fd, buf, 255);
+		fprintf(stderr, "read %d more\n", length);
+		dumpBuffer(buf, length);
+	} while (length > 0);
 }
 
 void dumpBuffer(unsigned char *buf, int length) {
