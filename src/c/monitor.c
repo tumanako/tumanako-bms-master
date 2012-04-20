@@ -484,16 +484,21 @@ char isCellShunting(short cellIndex) {
 }
 
 void sendCommand(unsigned short address, char sequence, char command) {
-	char buf[] = "heloXXYX";
+	unsigned char buf[6] = "XXYZCC";
 	// little endian
-	buf[4] = (char) address & 0x00FF;
-	buf[5] = (char) ((address & 0xFF00) >> 8);
-	buf[6] = sequence;
-	buf[7] = command;
+	buf[0] = (unsigned char) address & 0x00FF;
+	buf[1] = (unsigned char) ((address & 0xFF00) >> 8);
+	buf[2] = sequence;
+	buf[3] = command;
+	crc_t crc = crc_init();
+	crc = crc_update(crc, buf, 4);
+	crc = crc_finalize(crc);
+	buf[4] = (unsigned char) crc & 0x00FF;
+	buf[5] = (unsigned char) ((crc & 0xFF00) >> 8);
 	if (DEBUG) {
-		fprintf(stderr, "sending command '%c' to 0x%x%x\n", buf[7], buf[4], buf[5]);
+		fprintf(stderr, "sending command '%c' to 0x%02x%02x with CRC 0x%02x%02x\n", buf[3], buf[0], buf[1], buf[4], buf[5]);
 	}
-	writeSlowly(fd, buf, 8);
+	writeSlowly(fd, buf, 6);
 }
 
 void writeSlowly(int fd, char *s, int length) {
