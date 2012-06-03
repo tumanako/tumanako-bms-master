@@ -11,9 +11,12 @@
 #include <strings.h>
 #include <string.h>
 #include <unistd.h>
+#include <confuse.h>
 
 #include "../../../slave/src/c/evd5.h"
 
+#include "monitor.h"
+#include "config.h"
 #include "crc.h"
 #include "chargercontrol.h"
 #include "buscontrol.h"
@@ -39,34 +42,6 @@
 #define CHARGE_CURRENT_OVERSAMPLING 5
 #define LOOP_DELAY 10
 
-struct status_t {
-	unsigned short cellIndex;
-	unsigned short cellId;
-	unsigned short iShunt;
-	unsigned short vCell;
-	unsigned short vShunt;
-	unsigned short temperature;
-	unsigned short minCurrent;
-	unsigned char sequenceNumber;
-	// lower numbers == less gain
-	char gainPot;
-	// lower numbers == less voltage
-	char vShuntPot;
-	// true if we have received a character since the last time loopCounter overflowed
-	unsigned char hasRx;
-	// true if we are doing software addressing
-	unsigned char softwareAddressing;
-	// true if we are controlling the shunt current automatically
-	unsigned char automatic;
-	unsigned short crc;
-	// target current (what we last sent to the cell)
-	unsigned short targetShuntCurrent;
-	// microseconds required to acquire last reading
-	unsigned long latency;
-	unsigned char version;
-};
-
-void initCellIDArray();
 void sendCommand(unsigned char version, unsigned short address, char sequence, char command);
 void sendCommandV0(unsigned short address, char sequenceNumber, char command);
 void sendCommandV1(unsigned short address, char sequenceNumber, char command);
@@ -98,11 +73,16 @@ void getSlaveVersions();
 int fd;
 
 struct status_t *cells;
-int cellCount;
+unsigned short cellCount;
 
 char chargerState = 0;
 int main() {
 	struct termios oldtio, newtio;
+
+	if (initConfig()) {
+		printf("error reading configuration file\n");
+		return 1;
+	}
 
 	if (chargercontrol_init()) {
 		return 1;
@@ -146,8 +126,6 @@ int main() {
 
 	tcflush(fd, TCIFLUSH);
 	tcsetattr(fd, TCSANOW, &newtio);
-
-	initCellIDArray();
 
 	char seq = '0';
 
@@ -658,28 +636,6 @@ void getSlaveVersions() {
 		cells[i].version = cell.version;
 		printf("... version %d\n", cell.version);
 	}
-}
-
-void initCellIDArray() {
-	unsigned short id;
-	int count = 0;
-	FILE *in = fopen(CELL_ID_FILE, "r");
-	while (EOF != fscanf(in, "%hd\n", &id)) {
-		count++;
-	}
-	fclose(in);
-	fprintf(stderr, "Have %d cells\n", count);
-
-	cells = calloc(sizeof(struct status_t), count);
-	cellCount = count;
-
-	count = 0;
-	in = fopen(CELL_ID_FILE, "r");
-	while (EOF != fscanf(in, "%hd\n", &id)) {
-		cells[count].cellIndex = count;
-		cells[count++].cellId = id;
-	}
-	fclose(in);
 }
 
 void findCells() {
