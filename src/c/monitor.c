@@ -684,7 +684,7 @@ void initCellIDArray() {
 
 void findCells() {
 	struct status_t status;
-	for (int i = 0; i < 255; i++) {
+	for (unsigned short i = 0; i < 255; i++) {
 		status.cellId = i;
 		status.version = 0;
 		unsigned char found = 0;
