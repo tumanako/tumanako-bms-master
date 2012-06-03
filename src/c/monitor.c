@@ -42,6 +42,7 @@
 #define CHARGE_CURRENT_OVERSAMPLING 5
 #define LOOP_DELAY 10
 
+void initData(struct config_t *config);
 void sendCommand(unsigned char version, unsigned short address, char sequence, char command);
 void sendCommandV0(unsigned short address, char sequenceNumber, char command);
 void sendCommandV1(unsigned short address, char sequenceNumber, char command);
@@ -79,10 +80,12 @@ char chargerState = 0;
 int main() {
 	struct termios oldtio, newtio;
 
-	if (initConfig()) {
+	struct config_t *config = getConfig();
+	if (!config) {
 		printf("error reading configuration file\n");
 		return 1;
 	}
+	initData(config);
 
 	if (chargercontrol_init()) {
 		return 1;
@@ -657,5 +660,13 @@ void findCells() {
 		} else {
 			printf("found nothing at %d\n", i);
 		}
+	}
+}
+
+void initData(struct config_t *config) {
+	cellCount = config->cellCount;
+	cells = calloc(sizeof(struct status_t), cellCount);
+	for (unsigned short i = 0; i < cellCount; i++) {
+		cells[i].cellId = config->cellIds[i];
 	}
 }

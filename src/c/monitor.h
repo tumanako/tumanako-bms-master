@@ -45,6 +45,3 @@ struct status_t {
 	unsigned char version;
 };
 
-extern unsigned short cellCount;
-extern struct status_t *cells;
-

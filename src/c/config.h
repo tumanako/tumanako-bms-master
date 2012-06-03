@@ -18,4 +18,9 @@
  <http://www.gnu.org/licenses/>.
  */
 
-extern unsigned char initConfig();
+struct config_t {
+	unsigned short cellCount;
+	unsigned short *cellIds;
+};
+
+extern struct config_t *getConfig();

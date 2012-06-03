@@ -27,9 +27,9 @@
 /**
  * Load Configuration from config file
  *
- * @return 0 if configuration successfully loaded, 1 otherwise
+ * @return null if configuration was not loaded
  */
-unsigned char initConfig() {
+struct config_t *getConfig() {
 	cfg_opt_t opts[] = {
 			CFG_INT_LIST("cells", 0, CFGF_NODEFAULT),
 			CFG_END()
@@ -40,23 +40,27 @@ unsigned char initConfig() {
 	if (cfg_parse(cfg, "cells.conf") == CFG_PARSE_ERROR) {
 		printf("error loading configuration\n");
 		exit(1);
-		return 1;
+		return NULL;
 	}
 
 	if (cfg_size(cfg, "cells") > 512) {
 		fprintf(stderr, "Found %d cells, maximum supported is %d", cfg_size(cfg, "cells"), 512);
-		return 1;
+		return NULL;
 	}
-	cellCount = cfg_size(cfg, "cells");
-	cells = calloc(sizeof(struct status_t), cellCount);
-	for (int i = 0; i < cellCount; i++) {
+	struct config_t *result = malloc(sizeof(struct config_t));
+	if (!result) {
+		return NULL;
+	}
+	result->cellCount = cfg_size(cfg, "cells");
+	result->cellIds = malloc(sizeof(unsigned short) * result->cellCount);
+	for (int i = 0; i < result->cellCount; i++) {
 		long int cellId = cfg_getnint(cfg, "cells", i);
 		if (cellId > 0xffffffff) {
 			fprintf(stderr, "cellId '%d' at index %d too large must be smaller than %d\n", i, cellId, 0xffffffff);
-			return 0;
+			return NULL;
 		}
-		cells[i].cellId = cellId;
+		result->cellIds[i] = cellId;
 	}
-	printf("Loaded config got %d cells\n", cfg_size(cfg, "cells"));
-	return 0;
+	printf("Loaded config got %d cells\n", result->cellCount);
+	return result;
 }
