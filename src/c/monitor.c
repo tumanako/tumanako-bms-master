@@ -63,10 +63,13 @@ struct status_t {
 	unsigned short targetShuntCurrent;
 	// microseconds required to acquire last reading
 	unsigned long latency;
+	unsigned char version;
 };
 
 void initCellIDArray();
-void sendCommand(unsigned short address, char sequenceNumber, char command);
+void sendCommand(unsigned char version, unsigned short address, char sequence, char command);
+void sendCommandV0(unsigned short address, char sequenceNumber, char command);
+void sendCommandV1(unsigned short address, char sequenceNumber, char command);
 void getCellStates();
 void getCellState(unsigned short cellIndex);
 char _getCellState(unsigned short cellIndex, struct status_t *status, int attempts);
@@ -89,6 +92,8 @@ double asDouble(int s);
 void turnOffAllShunts();
 char isAnyCellShunting();
 char isCellShunting(short cellIndex);
+void flushInputBuffer();
+void getSlaveVersions();
 
 int fd;
 
@@ -150,7 +155,8 @@ int main() {
 	writeSlowly(fd, "garbage", 7);
 
 	for (int i = 0; i < cellCount; i++) {
-		sendCommand(cells[i].cellId, seq++, 'r');
+		sendCommand(0, cells[i].cellId, seq++, 'r');
+		sendCommand(1, cells[i].cellId, seq++, 'r');
 	}
 
 	sleep(1);
@@ -159,6 +165,8 @@ int main() {
 	writeSlowly(fd, "garbage", 7);
 
 	// findCells();
+
+	getSlaveVersions();
 
 	// clear the screen
 	write(2, "\E[H\E[2J", 7);
@@ -262,7 +270,7 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 		sentSequenceNumber = sequenceNumber++;
 		struct timeval start;
 		gettimeofday(&start, NULL);
-		sendCommand(status->cellId, sentSequenceNumber, '/');
+		sendCommand(status->version, status->cellId, sentSequenceNumber, '/');
 		actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
 		struct timeval end;
 		gettimeofday(&end, NULL);
@@ -380,7 +388,7 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 		} else {
 			return;
 		}
-		sendCommand(cells[cellIndex].cellId, '0', command);
+		sendCommand(cells[cellIndex].version, cells[cellIndex].cellId, '0', command);
 		readEnough(fd, buf, 7);
 		buf[6] = 0;
 		char *endPtr;
@@ -483,7 +491,28 @@ char isCellShunting(short cellIndex) {
 	return 0;
 }
 
-void sendCommand(unsigned short address, char sequence, char command) {
+void sendCommand(unsigned char version, unsigned short address, char sequence, char command) {
+	if (version == 0) {
+		sendCommandV0(address, sequence, command);
+	} else {
+		sendCommandV1(address, sequence, command);
+	}
+}
+
+void sendCommandV0(unsigned short address, char sequence, char command) {
+	char buf[] = "heloXXYX";
+	// little endian
+	buf[4] = (char) address & 0x00FF;
+	buf[5] = (char) ((address & 0xFF00) >> 8);
+	buf[6] = sequence;
+	buf[7] = command;
+	if (DEBUG) {
+		fprintf(stderr, "sending command '%c' to 0x%02x%02x with seq %02x\n", buf[7], buf[4], buf[5], sequence);
+	}
+	writeSlowly(fd, buf, 8);
+}
+
+void sendCommandV1(unsigned short address, char sequence, char command) {
 	unsigned char buf[6] = "XXYZCC";
 	// little endian
 	buf[0] = (unsigned char) address & 0x00FF;
@@ -609,6 +638,28 @@ double asDouble(int s) {
 	return ((double) s) / 1000;
 }
 
+/** Interrogate cells and discover their version number */
+void getSlaveVersions() {
+	// the cells don't support getVersion() so we try both protocols and see which works
+	for (unsigned short i = 0; i < cellCount; i++) {
+		struct status_t cell;
+		cell.cellId = cells[i].cellId;
+		cell.cellIndex = i;
+		printf("Checking cell %d (id %d) ...", i, cell.cellId);
+		cell.version = 0;
+		if (!_getCellState(i, &cell, 20)) {
+			printf("... trying version 1 ...");
+			cell.version = 1;
+			if (!_getCellState(i, &cell, 20)) {
+				printf("error getting version for cell %d (id %d)\n", i, cell.cellId);
+				exit(1);
+			}
+		}
+		cells[i].version = cell.version;
+		printf("... version %d\n", cell.version);
+	}
+}
+
 void initCellIDArray() {
 	unsigned short id;
 	int count = 0;
@@ -635,7 +686,17 @@ void findCells() {
 	struct status_t status;
 	for (int i = 0; i < 255; i++) {
 		status.cellId = i;
+		status.version = 0;
+		unsigned char found = 0;
 		if (_getCellState(0, &status, 1)) {
+			found = TRUE;
+		} else {
+			status.version = 1;
+			if (!_getCellState(0, &status, 1)) {
+				found = TRUE;
+			}
+		}
+		if (found) {
 			printf("found cell at %d\n", i);
 		} else {
 			printf("found nothing at %d\n", i);
