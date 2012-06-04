@@ -24,16 +24,23 @@
 #include "config.h"
 #include "monitor.h"
 
+unsigned char parseCell(cfg_t *cfg, struct config_battery_t *battery);
+
 /**
  * Load Configuration from config file
  *
  * @return null if configuration was not loaded
  */
 struct config_t *getConfig() {
-	cfg_opt_t opts[] = {
+	cfg_opt_t battery_opts[] = {
 			CFG_INT_LIST("cells", 0, CFGF_NODEFAULT),
 			CFG_END()
 	};
+	cfg_opt_t opts[] = {
+			CFG_SEC("battery", battery_opts, CFGF_TITLE | CFGF_MULTI),
+			CFG_END()
+	};
+
 
 	cfg_t *cfg = cfg_init(opts, CFGF_NONE);
 
@@ -43,24 +50,44 @@ struct config_t *getConfig() {
 		return NULL;
 	}
 
-	if (cfg_size(cfg, "cells") > 512) {
-		fprintf(stderr, "Found %d cells, maximum supported is %d", cfg_size(cfg, "cells"), 512);
+	if (cfg_size(cfg, "battery") > 10) {
+		fprintf(stderr, "Found %d batteries, maximum supported is %d", cfg_size(cfg, "battery"), 10);
 		return NULL;
 	}
+
 	struct config_t *result = malloc(sizeof(struct config_t));
-	if (!result) {
-		return NULL;
-	}
-	result->cellCount = cfg_size(cfg, "cells");
-	result->cellIds = malloc(sizeof(unsigned short) * result->cellCount);
-	for (int i = 0; i < result->cellCount; i++) {
-		long int cellId = cfg_getnint(cfg, "cells", i);
-		if (cellId > 0xffffffff) {
-			fprintf(stderr, "cellId '%d' at index %d too large must be smaller than %d\n", i, cellId, 0xffffffff);
+
+	result->batteryCount = cfg_size(cfg, "battery");
+	result->batteries = malloc(sizeof(struct config_battery_t) * result->batteryCount);
+	for (int i = 0; i < cfg_size(cfg, "battery"); i++) {
+		if (!parseCell(cfg_getnsec(cfg, "battery", i), &result->batteries[i])) {
+			free(result->batteries);
+			free(result);
 			return NULL;
 		}
-		result->cellIds[i] = cellId;
 	}
-	printf("Loaded config got %d cells\n", result->cellCount);
 	return result;
+}
+
+unsigned char parseCell(cfg_t *cfg, struct config_battery_t *battery) {
+	battery->name = cfg_title(cfg);
+	if (cfg_size(cfg, "cells") > 512) {
+		fprintf(stderr, "Found %d cells, maximum supported is %d", cfg_size(cfg, "cells"), 512);
+		return 0;
+	}
+	if (!battery) {
+		return 0;
+	}
+	battery->cellCount = cfg_size(cfg, "cells");
+	battery->cellIds = malloc(sizeof(unsigned short) * battery->cellCount);
+	for (int i = 0; i < battery->cellCount; i++) {
+		long int cellId = cfg_getnint(cfg, "cells", i);
+		if (cellId > 0xffffffff) {
+			fprintf(stderr, "cellId '%ld' at index %d too large must be smaller than %d\n", cellId, i, 0xffffffff);
+			return 0;
+		}
+		battery->cellIds[i] = cellId;
+	}
+	printf("Battery '%s' has %d cells\n", battery->name, battery->cellCount);
+	return 1;
 }

@@ -664,9 +664,15 @@ void findCells() {
 }
 
 void initData(struct config_t *config) {
-	cellCount = config->cellCount;
+	cellCount = 0;
+	for (int i = 0; i < config->batteryCount; i++) {
+		cellCount += config->batteries[i].cellCount;
+	}
 	cells = calloc(sizeof(struct status_t), cellCount);
-	for (unsigned short i = 0; i < cellCount; i++) {
-		cells[i].cellId = config->cellIds[i];
+	unsigned short i = 0;
+	for (unsigned char j = 0; j < config->batteryCount; j++) {
+		for (unsigned short k = 0; k < config->batteries[j].cellCount; k++) {
+			cells[i++].cellId = config->batteries[j].cellIds[k];
+		}
 	}
 }

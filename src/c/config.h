@@ -18,9 +18,15 @@
  <http://www.gnu.org/licenses/>.
  */
 
-struct config_t {
+struct config_battery_t {
+	const char *name;
 	unsigned short cellCount;
 	unsigned short *cellIds;
+};
+
+struct config_t {
+	unsigned char batteryCount;
+	struct config_battery_t *batteries;
 };
 
 extern struct config_t *getConfig();
