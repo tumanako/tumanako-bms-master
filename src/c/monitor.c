@@ -494,17 +494,17 @@ void sendCommandV0(unsigned short address, char sequence, char command) {
 }
 
 void sendCommandV1(unsigned short address, char sequence, char command) {
-	unsigned char buf[6] = "XXYZCC";
+	char buf[6] = "XXYZCC";
 	// little endian
-	buf[0] = (unsigned char) address & 0x00FF;
-	buf[1] = (unsigned char) ((address & 0xFF00) >> 8);
+	buf[0] = (char) address & 0x00FF;
+	buf[1] = (char) ((address & 0xFF00) >> 8);
 	buf[2] = sequence;
 	buf[3] = command;
 	crc_t crc = crc_init();
-	crc = crc_update(crc, buf, 4);
+	crc = crc_update(crc, (unsigned char *) buf, 4);
 	crc = crc_finalize(crc);
-	buf[4] = (unsigned char) crc & 0x00FF;
-	buf[5] = (unsigned char) ((crc & 0xFF00) >> 8);
+	buf[4] = (char) crc & 0x00FF;
+	buf[5] = (char) ((crc & 0xFF00) >> 8);
 	if (DEBUG) {
 		fprintf(stderr, "sending command '%c' to 0x%02x%02x with CRC 0x%02x%02x\n", buf[3], buf[0], buf[1], buf[4], buf[5]);
 	}
