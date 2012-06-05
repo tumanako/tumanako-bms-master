@@ -387,8 +387,8 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 }
 
 unsigned short minVoltage(struct battery_t *battery) {
-	int result = 999999;
-	for (int i = 0; i < battery->cellCount; i++) {
+	unsigned short result = 0xffff;
+	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		if (battery->cells[i].vCell < result) {
 			result = battery->cells[i].vCell;
 		}
@@ -397,9 +397,9 @@ unsigned short minVoltage(struct battery_t *battery) {
 }
 
 unsigned short minVoltageCell(struct battery_t *battery) {
-	int min = 999999;
-	int result = 0;
-	for (int i = 0; i < battery->cellCount; i++) {
+	unsigned short min = 0xffff;
+	unsigned short result = 0;
+	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		if (battery->cells[i].vCell < min) {
 			min = battery->cells[i].vCell;
 			result = i;
@@ -420,8 +420,8 @@ unsigned short maxVoltageInAnyBattery() {
 }
 
 unsigned short maxVoltage(struct battery_t *battery) {
-	unsigned result = 0;
-	for (int i = 0; i < battery->cellCount; i++) {
+	unsigned short result = 0;
+	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		if (battery->cells[i].vCell > result) {
 			result = battery->cells[i].vCell;
 		}
@@ -430,9 +430,9 @@ unsigned short maxVoltage(struct battery_t *battery) {
 }
 
 unsigned short maxVoltageCell(struct battery_t *battery) {
-	int max = 0;
+	unsigned short max = 0;
 	unsigned short result = 0;
-	for (int i = 0; i < battery->cellCount; i++) {
+	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		if (battery->cells[i].vCell > max) {
 			max = battery->cells[i].vCell;
 			result = i;
@@ -683,7 +683,7 @@ void findCells() {
 void initData(struct config_t *config) {
 	// first set up big array
 	cellCount = 0;
-	for (int i = 0; i < config->batteryCount; i++) {
+	for (unsigned char i = 0; i < config->batteryCount; i++) {
 		cellCount += config->batteries[i].cellCount;
 	}
 	cells = calloc(sizeof(struct status_t), cellCount);
