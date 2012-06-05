@@ -188,7 +188,9 @@ int main() {
 			shutdown = 1;
 		}
 		printSummary();
-		setShuntCurrent();
+		for (int i = 0; i < data.batteryCount; i++) {
+			setShuntCurrent(&data.batteries[i]);
+		}
 		fflush(NULL);
 
 		// If we don't have a kelvin connection then we will be turning off the shunts to read the voltages.
