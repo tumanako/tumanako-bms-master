@@ -41,7 +41,6 @@ struct config_t *getConfig() {
 			CFG_END()
 	};
 
-
 	cfg_t *cfg = cfg_init(opts, CFGF_NONE);
 
 	if (cfg_parse(cfg, "cells.conf") == CFG_PARSE_ERROR) {
@@ -50,8 +49,8 @@ struct config_t *getConfig() {
 		return NULL;
 	}
 
-	if (cfg_size(cfg, "battery") > 10) {
-		fprintf(stderr, "Found %d batteries, maximum supported is %d", cfg_size(cfg, "battery"), 10);
+	if (cfg_size(cfg, "battery") > MAX_BATTERIES) {
+		fprintf(stderr, "Found %d batteries, maximum supported is %d", cfg_size(cfg, "battery"), MAX_BATTERIES);
 		return NULL;
 	}
 
@@ -71,8 +70,8 @@ struct config_t *getConfig() {
 
 unsigned char parseCell(cfg_t *cfg, struct config_battery_t *battery) {
 	battery->name = cfg_title(cfg);
-	if (cfg_size(cfg, "cells") > 512) {
-		fprintf(stderr, "Found %d cells, maximum supported is %d", cfg_size(cfg, "cells"), 512);
+	if (cfg_size(cfg, "cells") > MAX_CELLS) {
+		fprintf(stderr, "Found %d cells, maximum supported is %d", cfg_size(cfg, "cells"), MAX_CELLS);
 		return 0;
 	}
 	if (!battery) {
@@ -82,8 +81,8 @@ unsigned char parseCell(cfg_t *cfg, struct config_battery_t *battery) {
 	battery->cellIds = malloc(sizeof(unsigned short) * battery->cellCount);
 	for (int i = 0; i < battery->cellCount; i++) {
 		long int cellId = cfg_getnint(cfg, "cells", i);
-		if (cellId > 0xffffffff) {
-			fprintf(stderr, "cellId '%ld' at index %d too large must be smaller than %d\n", cellId, i, 0xffffffff);
+		if (cellId > MAX_CELL_ID) {
+			fprintf(stderr, "cellId '%ld' at index %d too large must be smaller than %d\n", cellId, i, MAX_CELL_ID);
 			return 0;
 		}
 		battery->cellIds[i] = cellId;

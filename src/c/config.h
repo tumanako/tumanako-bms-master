@@ -18,6 +18,10 @@
  <http://www.gnu.org/licenses/>.
  */
 
+#define MAX_BATTERIES 10
+#define MAX_CELLS 1024
+#define MAX_CELL_ID 0xffff
+
 struct config_battery_t {
 	const char *name;
 	unsigned short cellCount;
