@@ -690,6 +690,8 @@ void initData(struct config_t *config) {
 	unsigned short i = 0;
 	for (unsigned char j = 0; j < config->batteryCount; j++) {
 		for (unsigned short k = 0; k < config->batteries[j].cellCount; k++) {
+			// TODO cell index doesn't make much sense anymore?
+			cells[i].cellIndex = i;
 			cells[i++].cellId = config->batteries[j].cellIds[k];
 		}
 	}
