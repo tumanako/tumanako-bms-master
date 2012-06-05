@@ -45,3 +45,14 @@ struct status_t {
 	unsigned char version;
 };
 
+struct battery_t {
+	const char *name;
+	unsigned short cellCount;
+	struct status_t *cells;
+};
+
+struct monitor_t {
+	unsigned char batteryCount;
+	struct battery_t *batteries;
+};
+

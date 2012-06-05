@@ -51,13 +51,14 @@ void getCellState(unsigned short cellIndex);
 char _getCellState(unsigned short cellIndex, struct status_t *status, int attempts);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, unsigned char *buf, int length);
-unsigned short maxVoltage();
-unsigned short maxVoltageCell();
-unsigned short minVoltage();
-unsigned short minVoltageCell();
-unsigned short avgVoltage();
-unsigned int totalVoltage();
-void setShuntCurrent();
+unsigned short maxVoltageInAnyBattery();
+unsigned short maxVoltage(struct battery_t *battery);
+unsigned short maxVoltageCell(struct battery_t *battery);
+unsigned short minVoltage(struct battery_t *battery);
+unsigned short minVoltageCell(struct battery_t *battery);
+unsigned short avgVoltage(struct battery_t *battery);
+unsigned int totalVoltage(struct battery_t *battery);
+void setShuntCurrent(struct battery_t *battery);
 void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
@@ -75,6 +76,8 @@ int fd;
 
 struct status_t *cells;
 unsigned short cellCount;
+
+struct monitor_t data;
 
 char chargerState = 0;
 int main() {
@@ -168,12 +171,12 @@ int main() {
 		}
 		getCellStates();
 		printf("\n");
-		if (maxVoltage() > CHARGER_OFF_VOLTAGE) {
+		if (maxVoltageInAnyBattery() > CHARGER_OFF_VOLTAGE) {
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
 			shutdown = 1;
 		}
-		if (maxVoltage() < CHARGER_ON_VOLTAGE || chargerState) {
+		if (maxVoltageInAnyBattery() < CHARGER_ON_VOLTAGE || chargerState) {
 			if (!shutdown) {
 				chargercontrol_setCharger(TRUE);
 				chargerState = 1;
@@ -330,11 +333,11 @@ void turnOffAllShunts() {
 	}
 }
 
-void setShuntCurrent() {
-	for (int i = 0; i < cellCount; i++) {
+void setShuntCurrent(struct battery_t *battery) {
+	for (int i = 0; i < battery->cellCount; i++) {
 		unsigned short target;
 		if (cells[i].vCell > SHUNT_ON_VOLTAGE) {
-			short difference = cells[i].vCell - minVoltage();
+			short difference = cells[i].vCell - minVoltage(battery);
 			if (difference < 50) {
 				target = 0;
 			} else {
@@ -383,60 +386,71 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 	exit(1);
 }
 
-unsigned short minVoltage() {
+unsigned short minVoltage(struct battery_t *battery) {
 	int result = 999999;
-	for (int i = 0; i < cellCount; i++) {
-		if (cells[i].vCell < result) {
-			result = cells[i].vCell;
+	for (int i = 0; i < battery->cellCount; i++) {
+		if (battery->cells[i].vCell < result) {
+			result = battery->cells[i].vCell;
 		}
 	}
 	return result;
 }
 
-unsigned short minVoltageCell() {
+unsigned short minVoltageCell(struct battery_t *battery) {
 	int min = 999999;
 	int result = 0;
-	for (int i = 0; i < cellCount; i++) {
-		if (cells[i].vCell < min) {
-			min = cells[i].vCell;
+	for (int i = 0; i < battery->cellCount; i++) {
+		if (battery->cells[i].vCell < min) {
+			min = battery->cells[i].vCell;
 			result = i;
 		}
 	}
 	return result;
 }
 
-unsigned short maxVoltage() {
-	unsigned result = 0;
-	for (int i = 0; i < cellCount; i++) {
-		if (cells[i].vCell > result) {
-			result = cells[i].vCell;
+unsigned short maxVoltageInAnyBattery() {
+	unsigned short result = 0;
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		unsigned short max = maxVoltage(&data.batteries[i]);
+		if (result < max) {
+			result = max;
 		}
 	}
 	return result;
 }
 
-unsigned short maxVoltageCell() {
+unsigned short maxVoltage(struct battery_t *battery) {
+	unsigned result = 0;
+	for (int i = 0; i < battery->cellCount; i++) {
+		if (battery->cells[i].vCell > result) {
+			result = battery->cells[i].vCell;
+		}
+	}
+	return result;
+}
+
+unsigned short maxVoltageCell(struct battery_t *battery) {
 	int max = 0;
 	unsigned short result = 0;
-	for (int i = 0; i < cellCount; i++) {
-		if (cells[i].vCell > max) {
-			max = cells[i].vCell;
+	for (int i = 0; i < battery->cellCount; i++) {
+		if (battery->cells[i].vCell > max) {
+			max = battery->cells[i].vCell;
 			result = i;
 		}
 	}
 	return result;
 }
 
-unsigned int totalVoltage() {
+unsigned int totalVoltage(struct battery_t *battery) {
 	int result = 0;
-	for (int i = 0; i < cellCount; i++) {
-		result += cells[i].vCell;
+	for (int i = 0; i < battery->cellCount; i++) {
+		result += battery->cells[i].vCell;
 	}
 	return result;
 }
 
-unsigned short avgVoltage() {
-	return totalVoltage() / cellCount;
+unsigned short avgVoltage(struct battery_t *battery) {
+	return totalVoltage(battery) / (battery->cellCount);
 }
 
 /**
@@ -575,9 +589,12 @@ void dumpBuffer(unsigned char *buf, int length) {
 }
 
 void printSummary() {
-	fprintf(stderr, "%.3f@%02d %.3f %.3f@%02d %6.3fV %6.2fV %7.2fA %7.2fAh %s\n", asDouble(minVoltage()),
-			minVoltageCell(), asDouble(avgVoltage()), asDouble(maxVoltage()), maxVoltageCell(),
-			asDouble(totalVoltage()), soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = &data.batteries[i];
+		fprintf(stderr, "%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name, asDouble(minVoltage(battery)),
+				minVoltageCell(battery), asDouble(avgVoltage(battery)), asDouble(maxVoltage(battery)), maxVoltageCell(battery),
+				asDouble(totalVoltage(battery)), soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
+	}
 }
 
 void printCellDetail(unsigned short cellIndex, struct status_t *status) {
@@ -664,6 +681,7 @@ void findCells() {
 }
 
 void initData(struct config_t *config) {
+	// first set up big array
 	cellCount = 0;
 	for (int i = 0; i < config->batteryCount; i++) {
 		cellCount += config->batteries[i].cellCount;
@@ -674,5 +692,17 @@ void initData(struct config_t *config) {
 		for (unsigned short k = 0; k < config->batteries[j].cellCount; k++) {
 			cells[i++].cellId = config->batteries[j].cellIds[k];
 		}
+	}
+
+	// then set up new battery-centric data structure
+	i = 0;
+	data.batteryCount = config->batteryCount;
+	data.batteries = malloc(sizeof(struct battery_t) * data.batteryCount);
+	for (unsigned char j; j < data.batteryCount; j++) {
+		struct battery_t *battery = &data.batteries[j];
+		battery->name = config->batteries[j].name;
+		battery->cellCount = config->batteries[j].cellCount;
+		battery->cells = &cells[i];
+		i += config->batteries[j].cellCount;
 	}
 }
