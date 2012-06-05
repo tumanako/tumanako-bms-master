@@ -591,12 +591,16 @@ void dumpBuffer(unsigned char *buf, int length) {
 }
 
 void printSummary() {
+	write(2, "\E[0J", 4);
+	printf("\n");
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = &data.batteries[i];
+		write(2, "\E[0J", 4);
 		fprintf(stderr, "%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name, asDouble(minVoltage(battery)),
 				minVoltageCell(battery), asDouble(avgVoltage(battery)), asDouble(maxVoltage(battery)), maxVoltageCell(battery),
 				asDouble(totalVoltage(battery)), soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
 	}
+	// TODO clear to the bottom of the screen
 }
 
 void printCellDetail(unsigned short cellIndex, struct status_t *status) {
