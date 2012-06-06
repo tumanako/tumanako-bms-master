@@ -24,7 +24,7 @@
 #include "config.h"
 #include "monitor.h"
 
-unsigned char parseCell(cfg_t *cfg, struct config_battery_t *battery);
+unsigned char parseBattery(cfg_t *cfg, struct config_battery_t *battery);
 
 /**
  * Load Configuration from config file
@@ -59,7 +59,7 @@ struct config_t *getConfig() {
 	result->batteryCount = cfg_size(cfg, "battery");
 	result->batteries = malloc(sizeof(struct config_battery_t) * result->batteryCount);
 	for (int i = 0; i < cfg_size(cfg, "battery"); i++) {
-		if (!parseCell(cfg_getnsec(cfg, "battery", i), &result->batteries[i])) {
+		if (!parseBattery(cfg_getnsec(cfg, "battery", i), &result->batteries[i])) {
 			free(result->batteries);
 			free(result);
 			return NULL;
@@ -68,7 +68,7 @@ struct config_t *getConfig() {
 	return result;
 }
 
-unsigned char parseCell(cfg_t *cfg, struct config_battery_t *battery) {
+unsigned char parseBattery(cfg_t *cfg, struct config_battery_t *battery) {
 	battery->name = cfg_title(cfg);
 	if (cfg_size(cfg, "cells") > MAX_CELLS) {
 		fprintf(stderr, "Found %d cells, maximum supported is %d", cfg_size(cfg, "cells"), MAX_CELLS);
