@@ -24,7 +24,9 @@
 
 extern double milliToDouble(short s);
 extern double centiToDouble(short s);
+void charToBuf(unsigned char c, __u8* buf);
 void shortToBuf(short s, __u8* buf);
+unsigned char bufToChar(__u8 *c);
 unsigned short bufToShort(__u8 *c);
 
 #endif /* TUMANAKO_UTIL_H_ */

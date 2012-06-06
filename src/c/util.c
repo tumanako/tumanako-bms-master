@@ -29,12 +29,23 @@ double centiToDouble(short s) {
 	return ((double) s) / 100;
 }
 
+/** Copy the passed char into the passed buffer. */
+void charToBuf(const unsigned char c, __u8* buf) {
+	buf[0] = (__u8) c;
+}
+
 /** Copy the passed short into the passed buffer. */
 void shortToBuf(short s, __u8* buf) {
 	buf[0] = (__u8) (s >> 8);
 	buf[1] = (__u8) (s & 0x00ff);
 }
 
+/**
+ * Make a char from the 8 bits starting at c
+ */
+unsigned char bufToChar(__u8 *c) {
+	return *c;
+}
 
 /**
  * Make a short from the 16 bits starting at c
@@ -47,4 +58,3 @@ unsigned short bufToShort(__u8 *c) {
 	result = result | *(c + 1);
 	return result;
 }
-
