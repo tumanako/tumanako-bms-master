@@ -47,8 +47,8 @@ void sendCommand(unsigned char version, unsigned short address, char sequence, c
 void sendCommandV0(unsigned short address, char sequenceNumber, char command);
 void sendCommandV1(unsigned short address, char sequenceNumber, char command);
 void getCellStates();
-void getCellState(unsigned short cellIndex);
-char _getCellState(unsigned short cellIndex, struct status_t *status, int attempts);
+void getCellState(struct status_t *cell);
+char _getCellState(struct status_t *status, int attempts);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, unsigned char *buf, int length);
 unsigned short maxVoltageInAnyBattery();
@@ -59,16 +59,16 @@ unsigned short minVoltageCell(struct battery_t *battery);
 unsigned short avgVoltage(struct battery_t *battery);
 unsigned int totalVoltage(struct battery_t *battery);
 void setShuntCurrent(struct battery_t *battery);
-void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent);
+void setMinCurrent(struct status_t *cell, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
 void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
 void printSummary();
-void printCellDetail(unsigned short cellIndex, struct status_t *status);
+void printCellDetail(struct status_t *status);
 double asDouble(int s);
 void turnOffAllShunts();
 char isAnyCellShunting();
-char isCellShunting(short cellIndex);
+char isCellShunting(struct status_t *cell);
 void flushInputBuffer();
 void getSlaveVersions();
 
@@ -211,31 +211,31 @@ void getCellStates() {
 	// move to the top of the screen
 	write(2, "\E[H", 3);
 	for (int i = 0; i < cellCount; i++) {
-		getCellState(i);
-		if (!isCellShunting(i)) {
+		struct status_t cell = cells[i];
+		getCellState(&cell);
+		if (!isCellShunting(&cell)) {
 			// the voltage doesn't mean much when we are drawing current
-			montiorCan_sendCellVoltage(i, cells[i].vCell);
+			montiorCan_sendCellVoltage(i, cell.vCell);
 		}
-		monitorCan_sendShuntCurrent(i, cells[i].iShunt);
-		monitorCan_sendMinCurrent(i, cells[i].minCurrent);
-		monitorCan_sendTemperature(i, cells[i].temperature);
-		struct status_t *status = &cells[i];
-		printCellDetail(i, status);
+		monitorCan_sendShuntCurrent(i, cell.iShunt);
+		monitorCan_sendMinCurrent(i, cell.minCurrent);
+		monitorCan_sendTemperature(i, cell.temperature);
+		printCellDetail(&cell);
 	}
 }
 
 unsigned char sequenceNumber = 0;
 
-void getCellState(unsigned short cellIndex) {
-	char success = _getCellState(cellIndex, &cells[cellIndex], 4);
+void getCellState(struct status_t *cell) {
+	char success = _getCellState(cell, 4);
 	if (!success) {
-		printf("bus errors talking to cell %d (id %d), exiting\n", cellIndex, cells[cellIndex].cellId);
+		printf("bus errors talking to cell %d (id %d), exiting\n", cell->cellIndex, cell->cellId);
 		chargercontrol_shutdown();
 		exit(1);
 	}
 }
 
-char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAttempts) {
+char _getCellState(struct status_t *status, int maxAttempts) {
 	int actualLength = 0;
 	for (int attempt = 0; TRUE; attempt++) {
 		if (attempt >= maxAttempts) {
@@ -245,7 +245,7 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 			exit(1);
 		}
 		if (attempt > 0 && actualLength == 0) {
-			fprintf(stderr, "no response from %d (id %d), resetting\n", cellIndex, status->cellId);
+			fprintf(stderr, "no response from %d (id %d), resetting\n", status->cellIndex, status->cellId);
 			buscontrol_setBus(FALSE);
 			sleep(1);
 			buscontrol_setBus(TRUE);
@@ -271,8 +271,8 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 		expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
 		expectedCRC = crc_finalize(expectedCRC);
 		if (expectedCRC != *actualCRC) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) expected CRC 0x%04x got 0x%04x\n", cellIndex,
-					cells[cellIndex].cellId, expectedCRC, *actualCRC);
+			fprintf(stderr, "\nSent message to %2d (id %2d) expected CRC 0x%04x got 0x%04x\n", status->cellIndex,
+					status->cellId, expectedCRC, *actualCRC);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
@@ -282,21 +282,21 @@ char _getCellState(unsigned short cellIndex, struct status_t *status, int maxAtt
 		// have to copy this one separately because of padding
 		evd5Status.crc = *actualCRC;
 		if (evd5Status.cellAddress != status->cellId) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) but recieved response from %x\n", cellIndex, status->cellId,
+			fprintf(stderr, "\nSent message to %2d (id %2d) but recieved response from %x\n", status->cellIndex, status->cellId,
 					evd5Status.cellAddress);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
 		}
 		if (evd5Status.sequenceNumber != sentSequenceNumber) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) with seq 0x%02x but received seq 0x%02hhx\n", cellIndex,
+			fprintf(stderr, "\nSent message to %2d (id %2d) with seq 0x%02x but received seq 0x%02hhx\n", status->cellIndex,
 					status->cellId, sentSequenceNumber, evd5Status.sequenceNumber);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
 		}
-		evd5ToStatus(&evd5Status, &cells[cellIndex]);
-		cells[cellIndex].latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+		evd5ToStatus(&evd5Status, status);
+		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 		break;
 	}
 	return 1;
@@ -311,7 +311,7 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 	to->sequenceNumber = from->sequenceNumber;
 	to->softwareAddressing = from->softwareAddressing;
 	to->temperature = from->temperature;
-	if (!isCellShunting(to->cellIndex)) {
+	if (!isCellShunting(to)) {
 		to->vCell = from->vCell;
 	}
 	to->vShunt = from->vShunt;
@@ -325,7 +325,7 @@ void turnOffAllShunts() {
 	for (int i = 0; i < cellCount; i++) {
 		struct status_t cell = cells[i];
 		if (cell.minCurrent != 0 || cell.targetShuntCurrent != 0) {
-			setMinCurrent(i, 0);
+			setMinCurrent(&cell, 0);
 			changed = 1;
 		}
 	}
@@ -337,9 +337,10 @@ void turnOffAllShunts() {
 
 void setShuntCurrent(struct battery_t *battery) {
 	for (int i = 0; i < battery->cellCount; i++) {
+		struct status_t cell = battery->cells[i];
 		unsigned short target;
-		if (cells[i].vCell > SHUNT_ON_VOLTAGE) {
-			short difference = cells[i].vCell - minVoltage(battery);
+		if (cell.vCell > SHUNT_ON_VOLTAGE) {
+			short difference = cell.vCell - minVoltage(battery);
 			if (difference < 50) {
 				target = 0;
 			} else {
@@ -354,17 +355,17 @@ void setShuntCurrent(struct battery_t *battery) {
 		} else {
 			target = 0;
 		}
-		setMinCurrent(i, target);
+		setMinCurrent(&cell, target);
 	}
 }
 
-void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
+void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 	char command;
 	unsigned char buf[7];
 	if (minCurrent > SHUNT_MAX_CURRENT) {
 		minCurrent = SHUNT_MAX_CURRENT;
 	}
-	cells[cellIndex].targetShuntCurrent = minCurrent;
+	cell->targetShuntCurrent = minCurrent;
 	int actual = SHUNT_MAX_CURRENT + 1;
 	for (int i = 0; i < 20; i++) {
 		if (actual > minCurrent) {
@@ -374,7 +375,7 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 		} else {
 			return;
 		}
-		sendCommand(cells[cellIndex].version, cells[cellIndex].cellId, '0', command);
+		sendCommand(cell->version, cell->cellId, '0', command);
 		readEnough(fd, buf, 7);
 		buf[6] = 0;
 		char *endPtr;
@@ -382,9 +383,9 @@ void setMinCurrent(unsigned short cellIndex, unsigned short minCurrent) {
 	}
 	// couldn't get to desired current after 10 attempts???
 	chargercontrol_shutdown();
-	getCellState(cellIndex);
-	fprintf(stderr, "%2d (id %2d) trying to get to %d but had %d actual = %d\n", cellIndex, cells[cellIndex].cellId,
-			minCurrent, cells[cellIndex].minCurrent, actual);
+	getCellState(cell);
+	fprintf(stderr, "%2d (id %2d) trying to get to %d but had %d actual = %d\n", cell->cellIndex, cell->cellId,
+			minCurrent, cell->minCurrent, actual);
 	exit(1);
 }
 
@@ -468,21 +469,21 @@ char isAnyCellShunting() {
 }
 
 /**
- * Returns true if the cell at index cellIndex or an adjacent cell is shunting current. This works
+ * Returns true if the passed cell or an adjacent cell is shunting current. This works
  * even when cells are out of order because each board has it's own end connections and we are careful
  * not to reorder cells within a board.
  */
-char isCellShunting(short cellIndex) {
+char isCellShunting(struct status_t *cell) {
 	if (HAS_KELVIN_CONNECTION) {
 		return 0;
 	}
-	if (cells[cellIndex].targetShuntCurrent != 0) {
+	if (cell->targetShuntCurrent != 0) {
 		return 1;
 	}
-	if (cellIndex != 0 && cells[cellIndex - 1].targetShuntCurrent != 0) {
+	if (cell->cellIndex != 0 && (cell - 1)->targetShuntCurrent != 0) {
 		return 1;
 	}
-	if (cellIndex + 1 < cellCount && cells[cellIndex + 1].targetShuntCurrent != 0) {
+	if (cell->cellIndex + 1 < cellCount && (cell + 1)->targetShuntCurrent != 0) {
 		return 1;
 	}
 	return 0;
@@ -603,7 +604,7 @@ void printSummary() {
 	// TODO clear to the bottom of the screen
 }
 
-void printCellDetail(unsigned short cellIndex, struct status_t *status) {
+void printCellDetail(struct status_t *status) {
 	if (status->minCurrent > 0) {
 		write(2, "\E[31m", 5);
 	} else {
@@ -612,7 +613,7 @@ void printCellDetail(unsigned short cellIndex, struct status_t *status) {
 	fprintf(
 			stderr,
 			"%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02hhx crc=%04hx %ld ",
-			cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
+			status->cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
 			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
 			status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc, status->latency / 1000);
 	unsigned char tens;
@@ -646,15 +647,13 @@ double asDouble(int s) {
 void getSlaveVersions() {
 	// the cells don't support getVersion() so we try both protocols and see which works
 	for (unsigned short i = 0; i < cellCount; i++) {
-		struct status_t cell;
-		cell.cellId = cells[i].cellId;
-		cell.cellIndex = i;
+		struct status_t cell = cells[i];
 		printf("Checking cell %d (id %d) ...", i, cell.cellId);
 		cell.version = 0;
-		if (!_getCellState(i, &cell, 20)) {
+		if (!_getCellState(&cell, 20)) {
 			printf("... trying version 1 ...");
 			cell.version = 1;
-			if (!_getCellState(i, &cell, 20)) {
+			if (!_getCellState(&cell, 20)) {
 				printf("error getting version for cell %d (id %d)\n", i, cell.cellId);
 				exit(1);
 			}
@@ -670,11 +669,11 @@ void findCells() {
 		status.cellId = i;
 		status.version = 0;
 		unsigned char found = 0;
-		if (_getCellState(0, &status, 1)) {
+		if (_getCellState(&status, 1)) {
 			found = TRUE;
 		} else {
 			status.version = 1;
-			if (!_getCellState(0, &status, 1)) {
+			if (!_getCellState(&status, 1)) {
 				found = TRUE;
 			}
 		}
