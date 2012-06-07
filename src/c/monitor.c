@@ -211,16 +211,16 @@ void getCellStates() {
 	// move to the top of the screen
 	write(2, "\E[H", 3);
 	for (int i = 0; i < cellCount; i++) {
-		struct status_t cell = cells[i];
-		getCellState(&cell);
-		if (!isCellShunting(&cell)) {
+		struct status_t *cell = cells + i;
+		getCellState(cell);
+		if (!isCellShunting(cell)) {
 			// the voltage doesn't mean much when we are drawing current
-			montiorCan_sendCellVoltage(i, cell.vCell);
+			montiorCan_sendCellVoltage(i, cell->vCell);
 		}
-		monitorCan_sendShuntCurrent(i, cell.iShunt);
-		monitorCan_sendMinCurrent(i, cell.minCurrent);
-		monitorCan_sendTemperature(i, cell.temperature);
-		printCellDetail(&cell);
+		monitorCan_sendShuntCurrent(i, cell->iShunt);
+		monitorCan_sendMinCurrent(i, cell->minCurrent);
+		monitorCan_sendTemperature(i, cell->temperature);
+		printCellDetail(cell);
 	}
 }
 
@@ -323,9 +323,9 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 void turnOffAllShunts() {
 	char changed = 0;
 	for (int i = 0; i < cellCount; i++) {
-		struct status_t cell = cells[i];
-		if (cell.minCurrent != 0 || cell.targetShuntCurrent != 0) {
-			setMinCurrent(&cell, 0);
+		struct status_t *cell = cells + i;
+		if (cell->minCurrent != 0 || cell->targetShuntCurrent != 0) {
+			setMinCurrent(cell, 0);
 			changed = 1;
 		}
 	}
@@ -337,10 +337,10 @@ void turnOffAllShunts() {
 
 void setShuntCurrent(struct battery_t *battery) {
 	for (int i = 0; i < battery->cellCount; i++) {
-		struct status_t cell = battery->cells[i];
+		struct status_t *cell = battery->cells + i;
 		unsigned short target;
-		if (cell.vCell > SHUNT_ON_VOLTAGE) {
-			short difference = cell.vCell - minVoltage(battery);
+		if (cell->vCell > SHUNT_ON_VOLTAGE) {
+			short difference = cell->vCell - minVoltage(battery);
 			if (difference < 50) {
 				target = 0;
 			} else {
@@ -355,7 +355,7 @@ void setShuntCurrent(struct battery_t *battery) {
 		} else {
 			target = 0;
 		}
-		setMinCurrent(&cell, target);
+		setMinCurrent(cell, target);
 	}
 }
 
@@ -595,7 +595,7 @@ void printSummary() {
 	write(2, "\E[0J", 4);
 	printf("\n");
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
-		struct battery_t *battery = &data.batteries[i];
+		struct battery_t *battery = data.batteries + i;
 		write(2, "\E[0J", 4);
 		fprintf(stderr, "%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name, asDouble(minVoltage(battery)),
 				minVoltageCell(battery), asDouble(avgVoltage(battery)), asDouble(maxVoltage(battery)), maxVoltageCell(battery),
@@ -647,19 +647,18 @@ double asDouble(int s) {
 void getSlaveVersions() {
 	// the cells don't support getVersion() so we try both protocols and see which works
 	for (unsigned short i = 0; i < cellCount; i++) {
-		struct status_t cell = cells[i];
-		printf("Checking cell %d (id %d) ...", i, cell.cellId);
-		cell.version = 0;
-		if (!_getCellState(&cell, 20)) {
+		struct status_t *cell = cells + i;
+		printf("Checking cell %d (id %d) ...", i, cell->cellId);
+		cell->version = 0;
+		if (!_getCellState(cell, 20)) {
 			printf("... trying version 1 ...");
-			cell.version = 1;
-			if (!_getCellState(&cell, 20)) {
-				printf("error getting version for cell %d (id %d)\n", i, cell.cellId);
+			cell->version = 1;
+			if (!_getCellState(cell, 20)) {
+				printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
 				exit(1);
 			}
 		}
-		cells[i].version = cell.version;
-		printf("... version %d\n", cell.version);
+		printf("... version %d\n", cell->version);
 	}
 }
 
@@ -705,8 +704,8 @@ void initData(struct config_t *config) {
 	i = 0;
 	data.batteryCount = config->batteryCount;
 	data.batteries = malloc(sizeof(struct battery_t) * data.batteryCount);
-	for (unsigned char j; j < data.batteryCount; j++) {
-		struct battery_t *battery = &data.batteries[j];
+	for (unsigned char j = 0; j < data.batteryCount; j++) {
+		struct battery_t *battery = data.batteries + j;
 		battery->name = config->batteries[j].name;
 		battery->cellCount = config->batteries[j].cellCount;
 		battery->cells = &cells[i];
