@@ -74,9 +74,6 @@ void getSlaveVersions();
 
 int fd;
 
-struct status_t *cells;
-unsigned short cellCount;
-
 struct monitor_t data;
 
 char chargerState = 0;
@@ -138,9 +135,12 @@ int main() {
 	// send some bytes to wake up the slaves
 	writeSlowly(fd, "garbage", 7);
 
-	for (unsigned short i = 0; i < cellCount; i++) {
-		sendCommand(0, cells[i].cellId, seq++, 'r');
-		sendCommand(1, cells[i].cellId, seq++, 'r');
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			sendCommand(0, battery->cells[j].cellId, seq++, 'r');
+			sendCommand(1, battery->cells[j].cellId, seq++, 'r');
+		}
 	}
 
 	sleep(1);
@@ -324,11 +324,14 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 /** turn shunting off on any cells that are shunting */
 void turnOffAllShunts() {
 	char changed = 0;
-	for (unsigned short i = 0; i < cellCount; i++) {
-		struct status_t *cell = cells + i;
-		if (cell->minCurrent != 0 || cell->targetShuntCurrent != 0) {
-			setMinCurrent(cell, 0);
-			changed = 1;
+	for (unsigned char i; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			struct status_t *cell = battery->cells + j;
+			if (cell->minCurrent != 0 || cell->targetShuntCurrent != 0) {
+				setMinCurrent(cell, 0);
+				changed = 1;
+			}
 		}
 	}
 	if (changed) {
@@ -462,9 +465,12 @@ unsigned short avgVoltage(struct battery_t *battery) {
  * @return true if any cell is shunting
  */
 char isAnyCellShunting() {
-	for (unsigned short i = 0; i < cellCount; i++) {
-		if (cells[i].targetShuntCurrent > 0) {
-			return 1;
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			if (battery->cells[j].targetShuntCurrent > 0) {
+				return 1;
+			}
 		}
 	}
 	return 0;
@@ -485,7 +491,7 @@ char isCellShunting(struct status_t *cell) {
 	if (cell->cellIndex != 0 && (cell - 1)->targetShuntCurrent != 0) {
 		return 1;
 	}
-	if (cell->cellIndex + 1 < cellCount && (cell + 1)->targetShuntCurrent != 0) {
+	if (cell->cellIndex + 1 < cell->battery->cellCount && (cell + 1)->targetShuntCurrent != 0) {
 		return 1;
 	}
 	return 0;
@@ -647,19 +653,22 @@ double asDouble(int s) {
 /** Interrogate cells and discover their version number */
 void getSlaveVersions() {
 	// the cells don't support getVersion() so we try both protocols and see which works
-	for (unsigned short i = 0; i < cellCount; i++) {
-		struct status_t *cell = cells + i;
-		printf("Checking cell %d (id %d) ...", i, cell->cellId);
-		cell->version = 0;
-		if (!_getCellState(cell, 20)) {
-			printf("... trying version 1 ...");
-			cell->version = 1;
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			struct status_t *cell = battery->cells + j;
+			printf("Checking cell %d (id %d) ...", i, cell->cellId);
+			cell->version = 0;
 			if (!_getCellState(cell, 20)) {
-				printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
-				exit(1);
+				printf("... trying version 1 ...");
+				cell->version = 1;
+				if (!_getCellState(cell, 20)) {
+					printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
+					exit(1);
+				}
 			}
+			printf("... version %d\n", cell->version);
 		}
-		printf("... version %d\n", cell->version);
 	}
 }
 
@@ -686,29 +695,18 @@ void findCells() {
 }
 
 void initData(struct config_t *config) {
-	// first set up big array
-	cellCount = 0;
-	for (unsigned char i = 0; i < config->batteryCount; i++) {
-		cellCount += config->batteries[i].cellCount;
-	}
-	cells = calloc(sizeof(struct status_t), cellCount);
-	unsigned short i = 0;
-	for (unsigned char j = 0; j < config->batteryCount; j++) {
-		for (unsigned short k = 0; k < config->batteries[j].cellCount; k++) {
-			cells[i].cellIndex = i;
-			cells[i++].cellId = config->batteries[j].cellIds[k];
-		}
-	}
-
-	// then set up new battery-centric data structure
-	i = 0;
 	data.batteryCount = config->batteryCount;
 	data.batteries = malloc(sizeof(struct battery_t) * data.batteryCount);
 	for (unsigned char j = 0; j < data.batteryCount; j++) {
 		struct battery_t *battery = data.batteries + j;
 		battery->name = config->batteries[j].name;
 		battery->cellCount = config->batteries[j].cellCount;
-		battery->cells = &cells[i];
-		i += config->batteries[j].cellCount;
+		battery->cells = calloc(sizeof(struct status_t), battery->cellCount);
+		for (unsigned short k = 0; k < battery->cellCount; k++) {
+			struct status_t *cell = battery->cells + k;
+			cell->cellIndex = k;
+			cell->cellId = config->batteries[j].cellIds[k];
+			cell->battery = battery;
+		}
 	}
 }

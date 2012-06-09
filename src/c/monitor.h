@@ -19,6 +19,7 @@
  */
 
 struct status_t {
+	struct battery_t *battery;
 	unsigned short cellIndex;
 	unsigned short cellId;
 	unsigned short iShunt;
