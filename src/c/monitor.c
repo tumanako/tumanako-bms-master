@@ -661,10 +661,10 @@ void getSlaveVersions() {
 			struct status_t *cell = battery->cells + j;
 			printf("Checking cell %d (id %d) ...", i, cell->cellId);
 			cell->version = 0;
-			if (!_getCellState(cell, 20)) {
+			if (!_getCellState(cell, 2)) {
 				printf("... trying version 1 ...");
 				cell->version = 1;
-				if (!_getCellState(cell, 20)) {
+				if (!_getCellState(cell, 2)) {
 					printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
 					exit(1);
 				}
