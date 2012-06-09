@@ -138,7 +138,7 @@ int main() {
 	// send some bytes to wake up the slaves
 	writeSlowly(fd, "garbage", 7);
 
-	for (int i = 0; i < cellCount; i++) {
+	for (unsigned short i = 0; i < cellCount; i++) {
 		sendCommand(0, cells[i].cellId, seq++, 'r');
 		sendCommand(1, cells[i].cellId, seq++, 'r');
 	}
@@ -188,7 +188,7 @@ int main() {
 			shutdown = 1;
 		}
 		printSummary();
-		for (int i = 0; i < data.batteryCount; i++) {
+		for (unsigned char i = 0; i < data.batteryCount; i++) {
 			setShuntCurrent(&data.batteries[i]);
 		}
 		fflush(NULL);
@@ -210,7 +210,7 @@ int main() {
 void getCellStates() {
 	// move to the top of the screen
 	write(2, "\E[H", 3);
-	for (int i = 0; i < cellCount; i++) {
+	for (unsigned short i = 0; i < cellCount; i++) {
 		struct status_t *cell = cells + i;
 		getCellState(cell);
 		if (!isCellShunting(cell)) {
@@ -322,7 +322,7 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 /** turn shunting off on any cells that are shunting */
 void turnOffAllShunts() {
 	char changed = 0;
-	for (int i = 0; i < cellCount; i++) {
+	for (unsigned short i = 0; i < cellCount; i++) {
 		struct status_t *cell = cells + i;
 		if (cell->minCurrent != 0 || cell->targetShuntCurrent != 0) {
 			setMinCurrent(cell, 0);
@@ -336,7 +336,7 @@ void turnOffAllShunts() {
 }
 
 void setShuntCurrent(struct battery_t *battery) {
-	for (int i = 0; i < battery->cellCount; i++) {
+	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		struct status_t *cell = battery->cells + i;
 		unsigned short target;
 		if (cell->vCell > SHUNT_ON_VOLTAGE) {
@@ -446,7 +446,7 @@ unsigned short maxVoltageCell(struct battery_t *battery) {
 
 unsigned int totalVoltage(struct battery_t *battery) {
 	int result = 0;
-	for (int i = 0; i < battery->cellCount; i++) {
+	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		result += battery->cells[i].vCell;
 	}
 	return result;
@@ -460,8 +460,8 @@ unsigned short avgVoltage(struct battery_t *battery) {
  * @return true if any cell is shunting
  */
 char isAnyCellShunting() {
-	for (int j = 0; j < cellCount; j++) {
-		if (cells[j].targetShuntCurrent > 0) {
+	for (unsigned short i = 0; i < cellCount; i++) {
+		if (cells[i].targetShuntCurrent > 0) {
 			return 1;
 		}
 	}
@@ -636,7 +636,6 @@ void printCellDetail(struct status_t *status) {
 	write(2, "\E[K", 3);
 	fprintf(stderr, "\n");
 	fflush(NULL);
-
 }
 
 double asDouble(int s) {
