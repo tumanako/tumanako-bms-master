@@ -231,7 +231,8 @@ unsigned char sequenceNumber = 0;
 void getCellState(struct status_t *cell) {
 	char success = _getCellState(cell, 4);
 	if (!success) {
-		printf("bus errors talking to cell %d (id %d), exiting\n", cell->cellIndex, cell->cellId);
+		printf("bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex,
+				cell->cellId, cell->battery->name);
 		chargercontrol_shutdown();
 		exit(1);
 	}
@@ -247,7 +248,8 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 			exit(1);
 		}
 		if (attempt > 0 && actualLength == 0) {
-			fprintf(stderr, "no response from %d (id %d), resetting\n", status->cellIndex, status->cellId);
+			fprintf(stderr, "no response from %d (id %d) in %s, resetting\n", status->cellIndex,
+					status->cellId, status->battery->name);
 			buscontrol_setBus(FALSE);
 			sleep(1);
 			buscontrol_setBus(TRUE);
@@ -263,7 +265,8 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		struct timeval end;
 		gettimeofday(&end, NULL);
 		if (actualLength != EVD5_STATUS_LENGTH) {
-			fprintf(stderr, "read %d, expected %d from cell %d\n", actualLength, EVD5_STATUS_LENGTH, status->cellId);
+			fprintf(stderr, "read %d, expected %d from cell %d (id %2d) in %s\n", actualLength,
+					EVD5_STATUS_LENGTH, status->cellIndex, status->cellId, status->battery->name);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
@@ -273,8 +276,8 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
 		expectedCRC = crc_finalize(expectedCRC);
 		if (expectedCRC != *actualCRC) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) expected CRC 0x%04x got 0x%04x\n", status->cellIndex,
-					status->cellId, expectedCRC, *actualCRC);
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s, expected CRC 0x%04x got 0x%04x\n",
+					status->cellIndex, status->cellId, status->battery->name, expectedCRC, *actualCRC);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
@@ -284,15 +287,16 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		// have to copy this one separately because of padding
 		evd5Status.crc = *actualCRC;
 		if (evd5Status.cellAddress != status->cellId) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) but recieved response from %x\n", status->cellIndex, status->cellId,
-					evd5Status.cellAddress);
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n",
+					status->cellIndex, status->cellId, status->battery->name, evd5Status.cellAddress);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
 		}
 		if (evd5Status.sequenceNumber != sentSequenceNumber) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) with seq 0x%02x but received seq 0x%02hhx\n", status->cellIndex,
-					status->cellId, sentSequenceNumber, evd5Status.sequenceNumber);
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s with seq 0x%02x but received seq 0x%02hhx\n",
+					status->cellIndex, status->cellId, status->battery->name, sentSequenceNumber,
+					evd5Status.sequenceNumber);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
@@ -389,8 +393,8 @@ void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 	// couldn't get to desired current after 10 attempts???
 	chargercontrol_shutdown();
 	getCellState(cell);
-	fprintf(stderr, "%2d (id %2d) trying to get to %d but had %d actual = %d\n", cell->cellIndex, cell->cellId,
-			minCurrent, cell->minCurrent, actual);
+	fprintf(stderr, "%2d (id %2d) in %s trying to get to %d but had %d actual = %d\n", cell->cellIndex,
+			cell->cellId, cell->battery->name, minCurrent, cell->minCurrent, actual);
 	exit(1);
 }
 
