@@ -32,6 +32,8 @@ struct config_battery_t {
 };
 
 struct config_t {
+	const char *serialPort;
+	unsigned short loopDelay;
 	unsigned char batteryCount;
 	struct config_battery_t *batteries;
 };

@@ -25,7 +25,6 @@
 #include "logger.h"
 
 #define BAUDRATE B9600
-#define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
@@ -40,7 +39,6 @@
 #define SHUNT_MAX_CURRENT 500
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
 #define CHARGE_CURRENT_OVERSAMPLING 5
-#define LOOP_DELAY 10
 
 void initData(struct config_t *config);
 void sendCommand(unsigned char version, unsigned short address, char sequence, char command);
@@ -108,9 +106,9 @@ int main() {
 	}
 
 	buscontrol_setBus(TRUE);
-	fd = open(MODEMDEVICE, O_RDWR | O_NOCTTY);
+	fd = open(config->serialPort, O_RDWR | O_NOCTTY);
 	if (fd < 0) {
-		perror(MODEMDEVICE);
+		perror(config->serialPort);
 		return -1;
 	}
 
@@ -161,7 +159,7 @@ int main() {
 	while (1) {
 		time_t t;
 		time(&t);
-		if (t < last + LOOP_DELAY) {
+		if (t < last + config->loopDelay) {
 			sleep(1);
 			continue;
 		}

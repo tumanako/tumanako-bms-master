@@ -37,6 +37,8 @@ struct config_t *getConfig() {
 			CFG_END()
 	};
 	cfg_opt_t opts[] = {
+			CFG_STR("serialPort", "/dev/ttyS0", CFGF_NONE),
+			CFG_INT("loopDelay", 10, CFGF_NONE),
 			CFG_SEC("battery", battery_opts, CFGF_TITLE | CFGF_MULTI),
 			CFG_END()
 	};
@@ -55,7 +57,8 @@ struct config_t *getConfig() {
 	}
 
 	struct config_t *result = malloc(sizeof(struct config_t));
-
+	result->serialPort = cfg_getstr(cfg, "serialPort");
+	result->loopDelay = cfg_getint(cfg, "loopDelay");
 	result->batteryCount = cfg_size(cfg, "battery");
 	result->batteries = malloc(sizeof(struct config_battery_t) * result->batteryCount);
 	for (int i = 0; i < cfg_size(cfg, "battery"); i++) {
