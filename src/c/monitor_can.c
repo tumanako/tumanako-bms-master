@@ -43,6 +43,7 @@
 #include "util.h"
 #include "monitor_can.h"
 
+void monitorCan_sendChar2Shorts(const short frameId, const char c, const short s1, const short s2);
 void monitorCan_send2Shorts(const short frameId, const short s1, const short s2);
 char monitorCan_send(struct can_frame *frame);
 
@@ -66,20 +67,31 @@ int monitorCan_init() {
 	return 0;
 }
 
-void montiorCan_sendCellVoltage(const short index, const short vCell) {
-	monitorCan_send2Shorts(0x3f0, index, vCell);
+void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short cellIndex, const short vCell) {
+	monitorCan_sendChar2Shorts(0x3f0, batteryIndex, cellIndex, vCell);
 }
 
-void monitorCan_sendShuntCurrent(const short index, const short iShunt) {
-	monitorCan_send2Shorts(0x3f1, index, iShunt);
+void monitorCan_sendShuntCurrent(const unsigned char batteryIndex, const short cellIndex, const short iShunt) {
+	monitorCan_sendChar2Shorts(0x3f1, batteryIndex, cellIndex, iShunt);
 }
 
-void monitorCan_sendMinCurrent(const short index, const short minCurrent) {
-	monitorCan_send2Shorts(0x3f2, index, minCurrent);
+void monitorCan_sendMinCurrent(const unsigned char batteryIndex, const short cellIndex, const short minCurrent) {
+	monitorCan_sendChar2Shorts(0x3f2, batteryIndex, cellIndex, minCurrent);
 }
 
-void monitorCan_sendTemperature(const short index, const short temperature) {
-	monitorCan_send2Shorts(0x3f3, index, temperature);
+void monitorCan_sendTemperature(const unsigned char batteryIndex, const short cellIndex, const short temperature) {
+	monitorCan_sendChar2Shorts(0x3f3, batteryIndex, cellIndex, temperature);
+}
+
+void monitorCan_sendChar2Shorts(const short frameId, const char c, const short s1, const short s2) {
+	struct can_frame frame;
+	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */
+	frame.can_id = frameId;
+	frame.can_dlc = 5;
+	charToBuf(c, frame.data);
+	shortToBuf(s1, frame.data + 1);
+	shortToBuf(s2, frame.data + 3);
+	monitorCan_send(&frame);
 }
 
 void monitorCan_send2Shorts(const short frameId, const short s1, const short s2) {

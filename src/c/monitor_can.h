@@ -25,9 +25,9 @@
 
 int monitorCan_init();
 
-void montiorCan_sendCellVoltage(const short index, const short vCell);
-void monitorCan_sendShuntCurrent(const short index, const short iShunt);
-void monitorCan_sendMinCurrent(const short index, const short minCurrent);
-void monitorCan_sendTemperature(const short index, const short temperature);
+void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short cellIndex, const short vCell);
+void monitorCan_sendShuntCurrent(const unsigned char batteryIndex, const short cellIndex, const short iShunt);
+void monitorCan_sendMinCurrent(const unsigned char batteryIndex, const short cellIndex, const short minCurrent);
+void monitorCan_sendTemperature(const unsigned char batteryIndex, const short cellIndex, const short temperature);
 
 #endif /* TUMANAKO_CAN_H_ */

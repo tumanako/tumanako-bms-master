@@ -18,6 +18,9 @@
  <http://www.gnu.org/licenses/>.
  */
 
+#ifndef CONFIG_H
+#define CONFIG_H
+
 #define MAX_BATTERIES 10
 #define MAX_CELLS 1024
 #define MAX_CELL_ID 0xffff
@@ -34,3 +37,5 @@ struct config_t {
 };
 
 extern struct config_t *getConfig();
+
+#endif

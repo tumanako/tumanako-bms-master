@@ -106,7 +106,7 @@ int main() {
 		return 1;
 	}
 	
-	if (logger_init()) {
+	if (logger_init(config)) {
 		return 1;
 	}
 
@@ -209,17 +209,20 @@ int main() {
 void getCellStates() {
 	// move to the top of the screen
 	write(2, "\E[H", 3);
-	for (unsigned short i = 0; i < cellCount; i++) {
-		struct status_t *cell = cells + i;
-		getCellState(cell);
-		if (!isCellShunting(cell)) {
-			// the voltage doesn't mean much when we are drawing current
-			montiorCan_sendCellVoltage(i, cell->vCell);
+	for (unsigned char i; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			struct status_t *cell = battery->cells + j;
+			getCellState(cell);
+			if (!isCellShunting(cell)) {
+				// the voltage doesn't mean much when we are drawing current
+				montiorCan_sendCellVoltage(i, j, cell->vCell);
+			}
+			monitorCan_sendShuntCurrent(i, j, cell->iShunt);
+			monitorCan_sendMinCurrent(i, j, cell->minCurrent);
+			monitorCan_sendTemperature(i, j, cell->temperature);
+			printCellDetail(cell);
 		}
-		monitorCan_sendShuntCurrent(i, cell->iShunt);
-		monitorCan_sendMinCurrent(i, cell->minCurrent);
-		monitorCan_sendTemperature(i, cell->temperature);
-		printCellDetail(cell);
 	}
 }
 

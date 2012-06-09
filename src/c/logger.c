@@ -41,6 +41,7 @@
 
 #include "soc.h"
 #include "util.h"
+#include "logger.h"
 
 struct logger_status_t {
 	int index;
@@ -52,37 +53,35 @@ struct logger_status_t {
 };
 
 struct threadArguments_t {
+	unsigned char batteryId;
 	char *filename;
-	short (*cellIdMapper)(short cellIndex);
-	short cellCount;
+	unsigned short cellCount;
+	unsigned short *cellIds;
 };
 
 extern int readFrame(int s, struct can_frame *frame);
-void logger_decode3f0(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short));
-void logger_decode3f1(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short));
-void logger_decode3f2(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short));
-void logger_decode3f3(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short));
+void logger_decode3f0(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
+void logger_decode3f1(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
+void logger_decode3f2(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
+void logger_decode3f3(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
 void *logger_backgroundThread(void *ptr);
 time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short cellCount, FILE *out);
 
-short logger_tractionMapper(short cellIndex);
-short logger_accessoryMapper(short cellIndex);
-
-int logger_init() {
-	struct threadArguments_t *tractionArgs = malloc(sizeof(struct threadArguments_t));
-	tractionArgs->filename = "traction.txt";
-	tractionArgs->cellIdMapper = logger_tractionMapper;
-	tractionArgs->cellCount = 36;
-	pthread_t tractionThread;
-	pthread_create(&tractionThread, NULL, logger_backgroundThread, (void *) tractionArgs);
-
-	struct threadArguments_t *accessoryArgs = malloc(sizeof(struct threadArguments_t));
-	accessoryArgs->filename = "accessory.txt";
-	accessoryArgs->cellIdMapper = logger_accessoryMapper;
-	accessoryArgs->cellCount = 4;
-	pthread_t accessoryThread;
-	pthread_create(&accessoryThread, NULL, logger_backgroundThread, (void *) accessoryArgs);
-
+unsigned char logger_init(struct config_t *config) {
+	for (unsigned char i = 0; i < config->batteryCount; i++) {
+		struct threadArguments_t *args = malloc(sizeof(struct threadArguments_t));
+		args->batteryId = i;
+		args->filename = malloc(strlen(config->batteries[i].name) + strlen(".txt") + 1);
+		if (args->filename == 0) {
+			return 1;
+		}
+		strcpy(args->filename, config->batteries[i].name);
+		strcat(args->filename, ".txt");
+		args->cellIds = config->batteries[i].cellIds;
+		args->cellCount = config->batteries[i].cellCount;
+		pthread_t thread;
+		pthread_create(&thread, NULL, logger_backgroundThread, (void *) args);
+	}
 	return 0;
 }
 
@@ -118,13 +117,13 @@ void *logger_backgroundThread(void *ptr) {
 			return NULL;
 		}
 		if (frame.can_id == 0x3f0) {
-			logger_decode3f0(&frame, cells, args->cellIdMapper);
+			logger_decode3f0(&frame, cells, args);
 		} else if (frame.can_id == 0x3f1) {
-			logger_decode3f1(&frame, cells, args->cellIdMapper);
+			logger_decode3f1(&frame, cells, args);
 		} else if (frame.can_id == 0x3f2) {
-			logger_decode3f2(&frame, cells, args->cellIdMapper);
+			logger_decode3f2(&frame, cells, args);
 		} else if (frame.can_id == 0x3f3) {
-			logger_decode3f3(&frame, cells, args->cellIdMapper);
+			logger_decode3f3(&frame, cells, args);
 		} else {
 			continue;
 		}
@@ -141,7 +140,7 @@ void *logger_backgroundThread(void *ptr) {
 time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short cellCount, FILE *out) {
 	time_t now;
 	time(&now);
-	if (now - last < 10) {
+	if (now - last < 1) {
 		// we wrote a line recently, wait some more
 		return last;
 	}
@@ -168,59 +167,58 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 }
 
 /* Decode a voltage frame. */
-void logger_decode3f0(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short)) {
-	short cellId = bufToShort(frame->data);
-	short cellIndex = cellIdMapper(cellId);
-	if (cellIndex != -1) {
-		cells[cellIndex].voltage = bufToShort(frame->data + 2);
-		cells[cellIndex].valued |= 0x01;
+void logger_decode3f0(struct can_frame *frame, struct logger_status_t cells[], struct threadArguments_t *args) {
+	unsigned char batteryId = bufToChar(frame->data);
+	if (batteryId != args->batteryId) {
+		return;
 	}
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > args->cellCount) {
+		return;
+	}
+	cells[cellIndex].voltage = bufToShort(frame->data + 3);
+	cells[cellIndex].valued |= 0x01;
 }
 
 /* Decode a shunt current frame. */
-void logger_decode3f1(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short)) {
-	short cellId = bufToShort(frame->data);
-	short cellIndex = cellIdMapper(cellId);
-	if (cellIndex != -1) {
-		cells[cellIndex].shuntCurrent = bufToShort(frame->data + 2);
-		cells[cellIndex].valued |= 0x02;
+void logger_decode3f1(struct can_frame *frame, struct logger_status_t cells[], struct threadArguments_t *args) {
+	unsigned char batteryId = bufToChar(frame->data);
+	if (batteryId != args->batteryId) {
+		return;
 	}
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > args->cellCount) {
+		return;
+	}
+	cells[cellIndex].shuntCurrent = bufToShort(frame->data + 3);
+	cells[cellIndex].valued |= 0x02;
 }
 
 /* Decode a minCurrent frame. */
-void logger_decode3f2(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short)) {
-	short cellId = bufToShort(frame->data);
-	short cellIndex = cellIdMapper(cellId);
-	if (cellIndex != -1) {
-		cells[cellIndex].minCurrent = bufToShort(frame->data + 2);
-		cells[cellIndex].valued |= 0x04;
+void logger_decode3f2(struct can_frame *frame, struct logger_status_t cells[], struct threadArguments_t *args) {
+	unsigned char batteryId = bufToChar(frame->data);
+	if (batteryId != args->batteryId) {
+		return;
 	}
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > args->cellCount) {
+		return;
+	}
+	cells[cellIndex].minCurrent = bufToShort(frame->data + 3);
+	cells[cellIndex].valued |= 0x04;
 }
 
 /* Decode a temperature frame. */
-void logger_decode3f3(struct can_frame *frame, struct logger_status_t cells[], short(*cellIdMapper)(short)) {
-	short cellId = bufToShort(frame->data);
-	short cellIndex = cellIdMapper(cellId);
-	if (cellIndex != -1) {
-		cells[cellIndex].temperature = bufToShort(frame->data + 2);
-		cells[cellIndex].valued |= 0x08;
+void logger_decode3f3(struct can_frame *frame, struct logger_status_t cells[], struct threadArguments_t *args) {
+	unsigned char batteryId = bufToChar(frame->data);
+	if (batteryId != args->batteryId) {
+		return;
 	}
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > args->cellCount) {
+		return;
+	}
+	cells[cellIndex].temperature = bufToShort(frame->data + 3);
+	cells[cellIndex].valued |= 0x08;
 }
 
-/* Cell index mapper for the traction battery. */
-short logger_tractionMapper(short cellIndex) {
-	// TODO make configurable
-	if (cellIndex >= 0 && cellIndex < 36) {
-		return cellIndex;
-	}
-	return -1;
-}
-
-/* Cell index mapper for the accessory battery. */
-short logger_accessoryMapper(short cellIndex) {
-	// TODO make configurable
-	if (cellIndex >= 36 && cellIndex < 40) {
-		return cellIndex - 36;
-	}
-	return -1;
-}

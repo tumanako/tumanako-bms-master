@@ -18,4 +18,6 @@
  <http://www.gnu.org/licenses/>.
  */
 
-char logger_init();
+#include "config.h"
+
+unsigned char logger_init(struct config_t *config);
