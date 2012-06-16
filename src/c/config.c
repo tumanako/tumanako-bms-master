@@ -61,7 +61,7 @@ struct config_t *getConfig() {
 	result->loopDelay = cfg_getint(cfg, "loopDelay");
 	result->batteryCount = cfg_size(cfg, "battery");
 	result->batteries = malloc(sizeof(struct config_battery_t) * result->batteryCount);
-	for (int i = 0; i < cfg_size(cfg, "battery"); i++) {
+	for (unsigned int i = 0; i < cfg_size(cfg, "battery"); i++) {
 		if (!parseBattery(cfg_getnsec(cfg, "battery", i), &result->batteries[i])) {
 			free(result->batteries);
 			free(result);
