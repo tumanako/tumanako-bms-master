@@ -145,7 +145,7 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 		return last;
 	}
 	for (int i = 0; i < cellCount; i++) {
-		if (!(cells[i].valued && 0x0f)) {
+		if (cells[i].valued != 0x0f) {
 			// no data from at least one cell since we last wrote a line, wait some more
 			return last;
 		}
