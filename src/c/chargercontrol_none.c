@@ -27,7 +27,7 @@ double chargercontrol_getChargeCurrent() {
 	return 0;
 }
 
-void chargercontrol_setCharger(char on) {
+void chargercontrol_setCharger(char on __attribute__ ((unused))) {
 	return;
 }
 
@@ -39,7 +39,7 @@ int buscontrol_init() {
 	return 0;
 }
 
-void buscontrol_setBus(char on) {
+void buscontrol_setBus(char on __attribute__ ((unused))) {
 	return;
 }
 
