@@ -16,15 +16,15 @@ MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 SRCS=$(wildcard *.c)
 HDRS=$(wildcard *.h)
 
-CFLAGS=-std=c99 -Wall -g $(CHARGER_CONTROL_CFLAGS)
-CC=gcc $(CFLAGS)
+CFLAGS=-std=c99 -Wextra -Wall -g $(CHARGER_CONTROL_CFLAGS)
+CC=gcc
 LDFLAGS=$(CHARGER_CONTROL_LDFLAGS)
 LIBS=-lm -lpthread -lconfuse $(CHARGER_CONTROL_LIBS)
 
 all: cycler
 
 cycler: $(MONITOR_OBJ)
-	$(CC) -o monitor $(MONITOR_OBJ) $(LDFLAGS) $(LIBS)
+	$(CC) -Wextra -Wall -o monitor $(MONITOR_OBJ) $(LDFLAGS) $(LIBS)
 
 clean:
 	rm -f *.o monitor
