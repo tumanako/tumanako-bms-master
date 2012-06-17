@@ -153,8 +153,8 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 
 	fprintf(out, "%d %.1f %.2f ", (int) now, soc_getCurrent(), soc_getAh());
 	for (int i = 0; i < cellCount; i++) {
-		struct logger_status_t cell = cells[i];
-		fprintf(out, " %.3f %.3f", milliToDouble(cell.voltage), milliToDouble(cell.shuntCurrent));
+		struct logger_status_t *cell = cells + i;
+		fprintf(out, " %.3f %.3f", milliToDouble(cell->voltage), milliToDouble(cell->shuntCurrent));
 	}
 	fprintf(out, "\n");
 	fflush(out);
