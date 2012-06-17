@@ -53,11 +53,11 @@ unsigned short makeShort(__u8 *c);
 unsigned long make24BitLong(__u8 *c);
 void *backgroundThread(void *ptr);
 
-volatile unsigned short volts;
-volatile long chargeCurrent;
-volatile long dischargeCurrent;
-volatile short aH;
-volatile short halfVoltage;
+volatile unsigned short volts = 0;
+volatile long chargeCurrent = 0;
+volatile long dischargeCurrent = 0;
+volatile short aH = 0;
+volatile short halfVoltage = 0;
 volatile char error = 0;
 
 int soc_init() {
