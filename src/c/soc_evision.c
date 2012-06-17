@@ -92,7 +92,7 @@ char soc_getError() {
 	return error;
 }
 
-void *backgroundThread(void *ptr) {
+void *backgroundThread(void *unused __attribute__ ((unused))) {
 	struct can_frame frame;
 
 	int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -174,7 +174,7 @@ void printFrame(struct can_frame *frame) {
 }
 
 int readFrame(int s, struct can_frame *frame) {
-	int nbytes = read(s, frame, sizeof(struct can_frame));
+	ssize_t nbytes = read(s, frame, sizeof(struct can_frame));
 
 	if (nbytes < 0) {
 		perror("can raw socket read");
@@ -182,7 +182,7 @@ int readFrame(int s, struct can_frame *frame) {
 	}
 
 	/* paranoid check ... */
-	if (nbytes < sizeof(struct can_frame)) {
+	if (nbytes < (int) sizeof(struct can_frame)) {
 		fprintf(stderr, "read: incomplete CAN frame\n");
 		return 1;
 	}
