@@ -155,13 +155,10 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 	for (int i = 0; i < cellCount; i++) {
 		struct logger_status_t *cell = cells + i;
 		fprintf(out, " %.3f %.3f", milliToDouble(cell->voltage), milliToDouble(cell->shuntCurrent));
+		cell->valued = 0;
 	}
 	fprintf(out, "\n");
 	fflush(out);
-
-	for (int i = 0; i < cellCount; i++) {
-		cells[i].valued = 0;
-	}
 
 	return now;
 }
