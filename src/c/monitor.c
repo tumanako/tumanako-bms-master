@@ -207,7 +207,7 @@ int main() {
 void getCellStates() {
 	// move to the top of the screen
 	write(2, "\E[H", 3);
-	for (unsigned char i; i < data.batteryCount; i++) {
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
@@ -326,7 +326,7 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 /** turn shunting off on any cells that are shunting */
 void turnOffAllShunts() {
 	char changed = 0;
-	for (unsigned char i; i < data.batteryCount; i++) {
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
