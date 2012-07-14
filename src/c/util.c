@@ -58,3 +58,32 @@ unsigned short bufToShort(__u8 *c) {
 	result = result | *(c + 1);
 	return result;
 }
+
+unsigned short bufToShortLE(__u8 *c) {
+	unsigned short result = *(c + 1);
+	result = result << 8;
+	result = result | *c;
+	return result;
+}
+
+unsigned long bufToLong(__u8 *c) {
+	unsigned long result = *c;
+	result = result << 8;
+	result = result | *(c + 1);
+	result = result << 8;
+	result = result | *(c + 2);
+	result = result << 8;
+	result = result | *(c + 3);
+	return result;
+}
+
+unsigned long bufToLongLE(__u8 *c) {
+	unsigned long result = *(c + 3);
+	result = result << 8;
+	result = result | *(c + 2);
+	result = result << 8;
+	result = result | *(c + 1);
+	result = result << 8;
+	result = result | *c;
+	return result;
+}
