@@ -101,7 +101,7 @@ int main() {
 	if (monitorCan_init()) {
 		return 1;
 	}
-	
+
 	if (logger_init(config)) {
 		return 1;
 	}
@@ -230,8 +230,8 @@ unsigned char sequenceNumber = 0;
 void getCellState(struct status_t *cell) {
 	char success = _getCellState(cell, 4);
 	if (!success) {
-		printf("bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex,
-				cell->cellId, cell->battery->name);
+		printf("bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
+				cell->battery->name);
 		chargercontrol_shutdown();
 		exit(1);
 	}
@@ -247,8 +247,8 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 			exit(1);
 		}
 		if (attempt > 0 && actualLength == 0) {
-			fprintf(stderr, "no response from %d (id %d) in %s, resetting\n", status->cellIndex,
-					status->cellId, status->battery->name);
+			fprintf(stderr, "no response from %d (id %d) in %s, resetting\n", status->cellIndex, status->cellId,
+					status->battery->name);
 			buscontrol_setBus(FALSE);
 			sleep(1);
 			buscontrol_setBus(TRUE);
@@ -264,8 +264,8 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		struct timeval end;
 		gettimeofday(&end, NULL);
 		if (actualLength != EVD5_STATUS_LENGTH) {
-			fprintf(stderr, "read %d, expected %d from cell %d (id %2d) in %s\n", actualLength,
-					EVD5_STATUS_LENGTH, status->cellIndex, status->cellId, status->battery->name);
+			fprintf(stderr, "read %d, expected %d from cell %d (id %2d) in %s\n", actualLength, EVD5_STATUS_LENGTH,
+					status->cellIndex, status->cellId, status->battery->name);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
@@ -275,8 +275,8 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
 		expectedCRC = crc_finalize(expectedCRC);
 		if (expectedCRC != *actualCRC) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) in %s, expected CRC 0x%04x got 0x%04x\n",
-					status->cellIndex, status->cellId, status->battery->name, expectedCRC, *actualCRC);
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s, expected CRC 0x%04x got 0x%04x\n", status->cellIndex,
+					status->cellId, status->battery->name, expectedCRC, *actualCRC);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
@@ -286,8 +286,8 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		// have to copy this one separately because of padding
 		evd5Status.crc = *actualCRC;
 		if (evd5Status.cellAddress != status->cellId) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n",
-					status->cellIndex, status->cellId, status->battery->name, evd5Status.cellAddress);
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n", status->cellIndex,
+					status->cellId, status->battery->name, evd5Status.cellAddress);
 			dumpBuffer(buf, actualLength);
 			flushInputBuffer();
 			continue;
@@ -392,8 +392,8 @@ void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 	// couldn't get to desired current after 10 attempts???
 	chargercontrol_shutdown();
 	getCellState(cell);
-	fprintf(stderr, "%2d (id %2d) in %s trying to get to %d but had %d actual = %d\n", cell->cellIndex,
-			cell->cellId, cell->battery->name, minCurrent, cell->minCurrent, actual);
+	fprintf(stderr, "%2d (id %2d) in %s trying to get to %d but had %d actual = %d\n", cell->cellIndex, cell->cellId,
+			cell->battery->name, minCurrent, cell->minCurrent, actual);
 	exit(1);
 }
 
@@ -534,7 +534,8 @@ void sendCommandV1(unsigned short address, char sequence, char command) {
 	buf[4] = (char) crc & 0x00FF;
 	buf[5] = (char) ((crc & 0xFF00) >> 8);
 	if (DEBUG) {
-		fprintf(stderr, "sending command '%c' to 0x%02x%02x with CRC 0x%02x%02x\n", buf[3], buf[0], buf[1], buf[4], buf[5]);
+		fprintf(stderr, "sending command '%c' to 0x%02x%02x with CRC 0x%02x%02x\n", buf[3], buf[0], buf[1], buf[4],
+				buf[5]);
 	}
 	writeSlowly(fd, buf, 6);
 }
@@ -608,9 +609,10 @@ void printSummary() {
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		write(2, "\E[0J", 4);
-		fprintf(stderr, "%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name, asDouble(minVoltage(battery)),
-				minVoltageCell(battery), asDouble(avgVoltage(battery)), asDouble(maxVoltage(battery)), maxVoltageCell(battery),
-				asDouble(totalVoltage(battery)), soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
+		fprintf(stderr, "%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name,
+				asDouble(minVoltage(battery)), minVoltageCell(battery), asDouble(avgVoltage(battery)),
+				asDouble(maxVoltage(battery)), maxVoltageCell(battery), asDouble(totalVoltage(battery)),
+				soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
 	}
 	// TODO clear to the bottom of the screen
 }
@@ -624,9 +626,10 @@ void printCellDetail(struct status_t *status) {
 	fprintf(
 			stderr,
 			"%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02hhx crc=%04hx %ld ",
-			status->cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
-			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
-			status->hasRx, status->softwareAddressing, status->automatic, status->sequenceNumber, status->crc, status->latency / 1000);
+			status->cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt),
+			asDouble(status->iShunt), asDouble(status->minCurrent), asDouble(status->temperature) * 10,
+			status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic,
+			status->sequenceNumber, status->crc, status->latency / 1000);
 	unsigned char tens;
 	unsigned char hundreds;
 	if (status->vCell < 3000) {
@@ -662,8 +665,8 @@ unsigned char getCellVersion(struct status_t *cell) {
 	unsigned char buf[10];
 	int actualRead = readEnough(fd, buf, 10);
 	if (actualRead != 10) {
-		fprintf(stderr, "Expected 10, read %d while getting version for %d (%d)", actualRead,
-				cell->cellIndex, cell->cellId);
+		fprintf(stderr, "Expected 10, read %d while getting version for %d (%d)", actualRead, cell->cellIndex,
+				cell->cellId);
 		return 0;
 	}
 	crc_t expectedCrc = crc_init();
