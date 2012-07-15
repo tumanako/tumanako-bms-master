@@ -164,6 +164,12 @@ int main() {
 			sleep(1);
 			continue;
 		}
+		if (config->loopDelay > 30) {
+			// if the slaves have gone to sleep, send some characters to wake them up
+			writeSlowly(fd, "garbage", 7);
+			// wait for slaves to wake up and take a measurement
+			sleep(2);
+		}
 		last = t;
 		if (!HAS_KELVIN_CONNECTION) {
 			turnOffAllShunts();
