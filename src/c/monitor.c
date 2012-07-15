@@ -37,7 +37,7 @@
 #define CHARGER_ON_VOLTAGE 3550
 #define CHARGER_OFF_VOLTAGE 3650
 #define SHUNT_ON_VOLTAGE 3500
-#define SHUNT_MAX_CURRENT 500
+#define SHUNT_MAX_CURRENT 300
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
 #define CHARGE_CURRENT_OVERSAMPLING 5
 
@@ -198,7 +198,7 @@ int main() {
 		// TODO implement "suspend" command to tell slaves to stop shunting and store their shunt config for
 		// later fast re-enabling
 		for (int j = 0; !HAS_KELVIN_CONNECTION && isAnyCellShunting() && j < 5; j++) {
-			sleep(2);
+			sleep(10);
 			getCellStates();
 		}
 	}
@@ -349,10 +349,10 @@ void setShuntCurrent(struct battery_t *battery) {
 		unsigned short target;
 		if (cell->vCell > SHUNT_ON_VOLTAGE) {
 			short difference = cell->vCell - minVoltage(battery);
-			if (difference < 50) {
+			if (difference < 30) {
 				target = 0;
 			} else {
-				target = (difference / 20) * 50 + 50;
+				target = (difference / 5) * 50 + 50;
 			}
 			if (target > SHUNT_MAX_CURRENT) {
 				target = SHUNT_MAX_CURRENT;
