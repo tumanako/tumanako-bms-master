@@ -368,6 +368,9 @@ void setShuntCurrent(struct battery_t *battery) {
 }
 
 void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
+	if (cell->minCurrent == minCurrent) {
+		return;
+	}
 	char command;
 	unsigned char buf[7];
 	if (minCurrent > SHUNT_MAX_CURRENT) {
