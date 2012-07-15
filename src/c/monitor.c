@@ -23,6 +23,7 @@
 #include "soc.h"
 #include "monitor_can.h"
 #include "logger.h"
+#include "util.h"
 
 #define BAUDRATE B9600
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
@@ -652,24 +653,56 @@ double asDouble(int s) {
 	return ((double) s) / 1000;
 }
 
+/**
+ * Obtain version information about the specified cell and store it in the passed cell structure
+ * @return true if version information was successfully obtained
+ */
+unsigned char getCellVersion(struct status_t *cell) {
+	sendCommandV1(cell->cellId, 0, '?');
+	unsigned char buf[10];
+	int actualRead = readEnough(fd, buf, 10);
+	if (actualRead != 10) {
+		fprintf(stderr, "Expected 10, read %d while getting version for %d (%d)", actualRead,
+				cell->cellIndex, cell->cellId);
+		return 0;
+	}
+	crc_t expectedCrc = crc_init();
+	expectedCrc = crc_update(expectedCrc, buf, 8);
+	expectedCrc = crc_finalize(expectedCrc);
+	crc_t actualCrc = bufToShortLE(buf + 8);
+	if (actualCrc != expectedCrc) {
+		fprintf(stderr, "crc missmatch %d != %d while getting version for %d (%d)", expectedCrc, actualCrc,
+				cell->cellIndex, cell->cellId);
+		return 0;
+	}
+	cell->version = buf[0];
+	cell->revision = bufToShortLE(buf + 1);
+	cell->isClean = buf[3];
+	cell->whenProgrammed = bufToLongLE(buf + 4);
+	return 1;
+}
+
 /** Interrogate cells and discover their version number */
 void getSlaveVersions() {
-	// the cells don't support getVersion() so we try both protocols and see which works
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
 			printf("Checking cell %d (id %d) ...", i, cell->cellId);
-			cell->version = 0;
-			if (!_getCellState(cell, 2)) {
-				printf("... trying version 1 ...");
-				cell->version = 1;
+			if (!getCellVersion(cell)) {
+				// some cells don't support getCellVersion() so we try both protocols and see which works
+				cell->version = 0;
 				if (!_getCellState(cell, 2)) {
-					printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
-					exit(1);
+					printf("... trying version 1 ...");
+					cell->version = 1;
+					if (!_getCellState(cell, 2)) {
+						printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
+						exit(1);
+					}
 				}
 			}
-			printf("... version %d\n", cell->version);
+			printf("... version %d r%d %s whenProgrammed %ld\n", cell->version, cell->revision,
+					cell->isClean ? "clean" : "modified", cell->whenProgrammed);
 		}
 	}
 }

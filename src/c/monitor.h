@@ -44,6 +44,9 @@ struct status_t {
 	// microseconds required to acquire last reading
 	unsigned long latency;
 	unsigned char version;
+	unsigned short revision;
+	unsigned char isClean;
+	unsigned long whenProgrammed;
 };
 
 struct battery_t {
