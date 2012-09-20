@@ -632,13 +632,10 @@ void printCellDetail(struct status_t *status) {
 	} else {
 		write(2, "\E[m", 3);
 	}
-	fprintf(
-			stderr,
-			"%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d hasRx=%d sa=%d auto=%d seq=%02hhx crc=%04hx %ld ",
-			status->cellIndex, status->cellId, asDouble(status->vCell), asDouble(status->vShunt),
-			asDouble(status->iShunt), asDouble(status->minCurrent), asDouble(status->temperature) * 10,
-			status->vShuntPot, status->gainPot, status->hasRx, status->softwareAddressing, status->automatic,
-			status->sequenceNumber, status->crc, status->latency / 1000);
+	fprintf(stderr, "%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %ld ", status->cellIndex,
+			status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
+			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
+			status->latency / 1000);
 	unsigned char tens;
 	unsigned char hundreds;
 	if (status->vCell < 3000) {
