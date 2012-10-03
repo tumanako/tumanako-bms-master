@@ -635,10 +635,11 @@ void printCellDetail(struct status_t *status) {
 	} else {
 		write(1, "\E[m", 3);
 	}
-	printf("%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %5d ", status->cellIndex,
+	char isClean = !status->isClean ? '*' : ' ';
+	printf("%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %4d%c %5d ", status->cellIndex,
 			status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
 			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
-			status->latency / 1000, status->errorCount);
+			status->latency / 1000, status->revision, isClean, status->errorCount);
 	unsigned char tens;
 	unsigned char hundreds;
 	if (status->vCell < 3000) {
