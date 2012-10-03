@@ -256,9 +256,7 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 			fprintf(stderr, "no response from %d (id %d) in %s, resetting\n", status->cellIndex, status->cellId,
 					status->battery->name);
 			buscontrol_setBus(FALSE);
-			sleep(1);
 			buscontrol_setBus(TRUE);
-			sleep(1);
 		}
 		unsigned char buf[EVD5_STATUS_LENGTH];
 		unsigned char sentSequenceNumber;

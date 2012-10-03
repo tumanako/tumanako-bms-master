@@ -86,6 +86,8 @@ void buscontrol_setBus(char on) {
 	} else {
 		eDO(hDevice, 1, BUS_RELAY_PORT, 0);
 	}
+	// sleep for to ensure bus settles
+	sleep(1);
 }
 
 int setWatchdog(HANDLE hDevice, char reset) {
