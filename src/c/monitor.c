@@ -695,10 +695,11 @@ void getSlaveVersions() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
-			printf("Checking cell %d (id %d) ...", i, cell->cellId);
+			printf("Checking cell %d (id %d) ...", j, cell->cellId);
 			if (!getCellVersion(cell)) {
 				// some cells don't support getCellVersion() so we try both protocols and see which works
 				cell->version = 0;
+				printf("... trying version 0 ...");
 				if (!_getCellState(cell, 2)) {
 					printf("... trying version 1 ...");
 					cell->version = 1;
