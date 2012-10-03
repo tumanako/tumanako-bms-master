@@ -46,7 +46,7 @@ void sendCommand(unsigned char version, unsigned short address, char sequence, c
 void sendCommandV0(unsigned short address, char sequenceNumber, char command);
 void sendCommandV1(unsigned short address, char sequenceNumber, char command);
 void getCellStates();
-void getCellState(struct status_t *cell);
+char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
 void writeSlowly(int fd, char *s, int length);
 int readEnough(int fd, unsigned char *buf, int length);
@@ -218,7 +218,12 @@ void getCellStates() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
-			getCellState(cell);
+			char success = getCellState(cell);
+			printCellDetail(cell);
+			if (!success) {
+				cell->errorCount++;
+				continue;
+			}
 			if (!isCellShunting(cell)) {
 				// the voltage doesn't mean much when we are drawing current
 				montiorCan_sendCellVoltage(i, j, cell->vCell);
@@ -226,21 +231,21 @@ void getCellStates() {
 			monitorCan_sendShuntCurrent(i, j, cell->iShunt);
 			monitorCan_sendMinCurrent(i, j, cell->minCurrent);
 			monitorCan_sendTemperature(i, j, cell->temperature);
-			printCellDetail(cell);
 		}
 	}
 }
 
 unsigned char sequenceNumber = 0;
 
-void getCellState(struct status_t *cell) {
-	char success = _getCellState(cell, 4);
+char getCellState(struct status_t *cell) {
+	char success = _getCellState(cell, 1);
 	if (!success) {
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
 				cell->battery->name);
 		chargercontrol_shutdown();
-		exit(1);
+		return FALSE;
 	}
+	return TRUE;
 }
 
 char _getCellState(struct status_t *status, int maxAttempts) {
@@ -630,10 +635,10 @@ void printCellDetail(struct status_t *status) {
 	} else {
 		write(1, "\E[m", 3);
 	}
-	printf("%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %ld ", status->cellIndex,
+	printf("%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %5d ", status->cellIndex,
 			status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
 			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
-			status->latency / 1000);
+			status->latency / 1000, status->errorCount);
 	unsigned char tens;
 	unsigned char hundreds;
 	if (status->vCell < 3000) {
@@ -696,6 +701,7 @@ void getSlaveVersions() {
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
 			printf("Checking cell %d (id %d) ...", j, cell->cellId);
+			cell->errorCount = 0;
 			if (!getCellVersion(cell)) {
 				// some cells don't support getCellVersion() so we try both protocols and see which works
 				cell->version = 0;
@@ -705,7 +711,7 @@ void getSlaveVersions() {
 					cell->version = 1;
 					if (!_getCellState(cell, 2)) {
 						printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
-						exit(1);
+						cell->errorCount = 1;
 					}
 				}
 			}

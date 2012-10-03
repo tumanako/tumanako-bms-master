@@ -47,6 +47,7 @@ struct status_t {
 	unsigned short revision;
 	unsigned char isClean;
 	unsigned long whenProgrammed;
+	unsigned short errorCount;
 };
 
 struct battery_t {
