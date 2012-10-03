@@ -152,7 +152,7 @@ int main() {
 	getSlaveVersions();
 
 	// clear the screen
-	write(2, "\E[H\E[2J", 7);
+	write(1, "\E[H\E[2J", 7);
 
 	chargerState = 0;
 	time_t last = 0;
@@ -213,7 +213,7 @@ int main() {
 
 void getCellStates() {
 	// move to the top of the screen
-	write(2, "\E[H", 3);
+	write(1, "\E[H", 3);
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
@@ -236,7 +236,7 @@ unsigned char sequenceNumber = 0;
 void getCellState(struct status_t *cell) {
 	char success = _getCellState(cell, 4);
 	if (!success) {
-		printf("bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
+		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
 				cell->battery->name);
 		chargercontrol_shutdown();
 		exit(1);
@@ -613,12 +613,12 @@ void dumpBuffer(unsigned char *buf, int length) {
 }
 
 void printSummary() {
-	write(2, "\E[0J", 4);
+	write(1, "\E[0J", 4);
 	printf("\n");
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
-		write(2, "\E[0J", 4);
-		fprintf(stderr, "%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name,
+		write(1, "\E[0J", 4);
+		printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name,
 				asDouble(minVoltage(battery)), minVoltageCell(battery), asDouble(avgVoltage(battery)),
 				asDouble(maxVoltage(battery)), maxVoltageCell(battery), asDouble(totalVoltage(battery)),
 				soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
@@ -628,11 +628,11 @@ void printSummary() {
 
 void printCellDetail(struct status_t *status) {
 	if (status->minCurrent > 0) {
-		write(2, "\E[31m", 5);
+		write(1, "\E[31m", 5);
 	} else {
-		write(2, "\E[m", 3);
+		write(1, "\E[m", 3);
 	}
-	fprintf(stderr, "%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %ld ", status->cellIndex,
+	printf("%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %ld ", status->cellIndex,
 			status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
 			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
 			status->latency / 1000);
@@ -647,14 +647,14 @@ void printCellDetail(struct status_t *status) {
 	}
 	for (int j = 0; j < hundreds; j++) {
 		for (int k = 0; k < 10; k++) {
-			fprintf(stderr, "*");
+			printf("*");
 		}
 	}
 	for (int j = 0; j < tens; j++) {
-		fprintf(stderr, "-");
+		printf("-");
 	}
-	write(2, "\E[K", 3);
-	fprintf(stderr, "\n");
+	write(1, "\E[K", 3);
+	printf("\n");
 	fflush(NULL);
 }
 
