@@ -43,7 +43,7 @@ struct status_t {
 	unsigned short targetShuntCurrent;
 	// microseconds required to acquire last reading
 	unsigned long latency;
-	unsigned char version;
+	char version;
 	unsigned short revision;
 	unsigned char isClean;
 	unsigned long whenProgrammed;

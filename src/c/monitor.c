@@ -42,7 +42,7 @@
 #define CHARGE_CURRENT_OVERSAMPLING 5
 
 void initData(struct config_t *config);
-void sendCommand(unsigned char version, unsigned short address, char sequence, char command);
+void sendCommand(char version, unsigned short address, char sequence, char command);
 void sendCommandV0(unsigned short address, char sequenceNumber, char command);
 void sendCommandV1(unsigned short address, char sequenceNumber, char command);
 void getCellStates();
@@ -69,6 +69,7 @@ void turnOffAllShunts();
 char isAnyCellShunting();
 char isCellShunting(struct status_t *cell);
 void flushInputBuffer();
+unsigned char getCellVersion(struct status_t *cell);
 void getSlaveVersions();
 
 int fd;
@@ -238,6 +239,12 @@ void getCellStates() {
 unsigned char sequenceNumber = 0;
 
 char getCellState(struct status_t *cell) {
+	// if we didn't get the cell version at startup, try again
+	if (cell->version == (char) -1) {
+		if (!getCellVersion(cell)) {
+			return FALSE;
+		}
+	}
 	char success = _getCellState(cell, 1);
 	if (!success) {
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
@@ -395,6 +402,10 @@ void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 		} else {
 			return;
 		}
+		if (cell->version == (char) -1) {
+			// if we don't know the verison then we can't send commands
+			return;
+		}
 		sendCommand(cell->version, cell->cellId, '0', command);
 		readEnough(fd, buf, 7);
 		buf[6] = 0;
@@ -512,11 +523,14 @@ char isCellShunting(struct status_t *cell) {
 	return 0;
 }
 
-void sendCommand(unsigned char version, unsigned short address, char sequence, char command) {
+void sendCommand(char version, unsigned short address, char sequence, char command) {
 	if (version == 0) {
 		sendCommandV0(address, sequence, command);
-	} else {
+	} else if (version == 1) {
 		sendCommandV1(address, sequence, command);
+	} else {
+		printf("unknown version %hhd\n", version);
+		exit(1);
 	}
 }
 
@@ -636,7 +650,7 @@ void printCellDetail(struct status_t *status) {
 		write(1, "\E[m", 3);
 	}
 	char isClean = !status->isClean ? '*' : ' ';
-	printf("%02d %02d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %4d%c %5d ", status->cellIndex,
+	printf("%02d %d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %4hhd%c %5d ", status->cellIndex,
 			status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
 			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
 			status->latency / 1000, status->revision, isClean, status->errorCount);
@@ -666,11 +680,7 @@ double asDouble(int s) {
 	return ((double) s) / 1000;
 }
 
-/**
- * Obtain version information about the specified cell and store it in the passed cell structure
- * @return true if version information was successfully obtained
- */
-unsigned char getCellVersion(struct status_t *cell) {
+unsigned char _getCellVersion(struct status_t *cell) {
 	sendCommandV1(cell->cellId, 0, '?');
 	unsigned char buf[10];
 	int actualRead = readEnough(fd, buf, 10);
@@ -695,6 +705,29 @@ unsigned char getCellVersion(struct status_t *cell) {
 	return 1;
 }
 
+/**
+ * Obtain version information about the specified cell and store it in the passed cell structure
+ * @return true if version information was successfully obtained
+ */
+unsigned char getCellVersion(struct status_t *cell) {
+	if (_getCellVersion(cell)) {
+		return TRUE;
+	}
+	// some cells don't support getCellVersion() so we try both protocols and see which works
+	cell->version = 0;
+	if (_getCellState(cell, 2)) {
+		return TRUE;
+	}
+	cell->version = 1;
+	if (_getCellState(cell, 2)) {
+		return TRUE;
+	}
+	fprintf(stderr, "error getting version for cell %d (id %d)\n", cell->cellIndex, cell->cellId);
+	cell->errorCount++;
+	cell->version = -1;
+	return FALSE;
+}
+
 /** Interrogate cells and discover their version number */
 void getSlaveVersions() {
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
@@ -703,19 +736,7 @@ void getSlaveVersions() {
 			struct status_t *cell = battery->cells + j;
 			printf("Checking cell %d (id %d) ...", j, cell->cellId);
 			cell->errorCount = 0;
-			if (!getCellVersion(cell)) {
-				// some cells don't support getCellVersion() so we try both protocols and see which works
-				cell->version = 0;
-				printf("... trying version 0 ...");
-				if (!_getCellState(cell, 2)) {
-					printf("... trying version 1 ...");
-					cell->version = 1;
-					if (!_getCellState(cell, 2)) {
-						printf("error getting version for cell %d (id %d)\n", i, cell->cellId);
-						cell->errorCount = 1;
-					}
-				}
-			}
+			getCellVersion(cell);
 			printf("... version %d r%d %s whenProgrammed %ld\n", cell->version, cell->revision,
 					cell->isClean ? "clean" : "modified", cell->whenProgrammed);
 		}
