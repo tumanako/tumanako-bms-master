@@ -55,7 +55,6 @@
 #define CHARGER_RELAY_PORT 7
 #define CHARGER_ON_VOLTAGE 3550
 #define CHARGER_OFF_VOLTAGE 3650
-#define SHUNT_ON_VOLTAGE 3500
 #define SHUNT_MAX_CURRENT 300
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
 #define CHARGE_CURRENT_OVERSAMPLING 5
@@ -76,7 +75,7 @@ unsigned short minVoltage(struct battery_t *battery);
 unsigned short minVoltageCell(struct battery_t *battery);
 unsigned short avgVoltage(struct battery_t *battery);
 unsigned int totalVoltage(struct battery_t *battery);
-void setShuntCurrent(struct battery_t *battery);
+void setShuntCurrent(struct config_t *config, struct battery_t *battery);
 void setMinCurrent(struct status_t *cell, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
@@ -213,7 +212,7 @@ int main() {
 		}
 		printSummary();
 		for (unsigned char i = 0; i < data.batteryCount; i++) {
-			setShuntCurrent(&data.batteries[i]);
+			setShuntCurrent(config, &data.batteries[i]);
 		}
 		fflush(NULL);
 
@@ -379,13 +378,13 @@ void turnOffAllShunts() {
 	}
 }
 
-void setShuntCurrent(struct battery_t *battery) {
+void setShuntCurrent(struct config_t *config, struct battery_t *battery) {
 	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		struct status_t *cell = battery->cells + i;
 		unsigned short target;
-		if (cell->vCell > SHUNT_ON_VOLTAGE) {
+		if (cell->vCell > config->minVoltageSocRelevant) {
 			short difference = cell->vCell - minVoltage(battery);
-			if (difference < 30) {
+			if (difference < config->voltageDeadband) {
 				target = 0;
 			} else {
 				target = (difference / 5) * 50 + 50;
@@ -393,11 +392,14 @@ void setShuntCurrent(struct battery_t *battery) {
 			if (target > SHUNT_MAX_CURRENT) {
 				target = SHUNT_MAX_CURRENT;
 			} else if (target > 0 && target < 150) {
-				// TODO the slaves don't respond to shunt demands less than 150 :(
+				// the slaves don't respond to shunt demands less than 150 :(
 				target = 150;
 			}
 		} else {
 			target = 0;
+		}
+		if (target < config->minShuntCurrent) {
+			target = config->minShuntCurrent;
 		}
 		setMinCurrent(cell, target);
 	}
