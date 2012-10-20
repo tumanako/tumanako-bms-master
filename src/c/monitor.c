@@ -263,7 +263,7 @@ char getCellState(struct status_t *cell) {
 			return FALSE;
 		}
 	}
-	char success = _getCellState(cell, 1);
+	char success = _getCellState(cell, 2);
 	if (!success) {
 		cell->errorCount++;
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
@@ -734,11 +734,11 @@ unsigned char getCellVersion(struct status_t *cell) {
 	}
 	// some cells don't support getCellVersion() so we try both protocols and see which works
 	cell->version = 0;
-	if (_getCellState(cell, 2)) {
+	if (_getCellState(cell, 1)) {
 		return TRUE;
 	}
 	cell->version = 1;
-	if (_getCellState(cell, 2)) {
+	if (_getCellState(cell, 1)) {
 		return TRUE;
 	}
 	fprintf(stderr, "error getting version for cell %d (id %d)\n", cell->cellIndex, cell->cellId);
