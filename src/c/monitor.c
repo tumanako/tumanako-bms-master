@@ -59,14 +59,21 @@
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
 #define CHARGE_CURRENT_OVERSAMPLING 5
 
+#define ESCAPE_CHARACTER 0xff
+#define START_OF_PACKET 0xfe
+
 void initData(struct config_t *config);
 void sendCommand(char version, unsigned short address, char sequence, char command);
 void sendCommandV0(unsigned short address, char sequenceNumber, char command);
 void sendCommandV1(unsigned short address, char sequenceNumber, char command);
+void sendCommandV2(unsigned short address, char sequenceNumber, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
 void writeSlowly(int fd, char *s, int length);
+crc_t writeCrc(unsigned char c, crc_t crc);
+crc_t writeWithEscapeCrc(unsigned char c, crc_t crc);
+void writeWithEscape(unsigned char c);
 int readEnough(int fd, unsigned char *buf, int length);
 unsigned short maxVoltageInAnyBattery();
 unsigned short maxVoltage(struct battery_t *battery);
@@ -573,8 +580,10 @@ char isCellShunting(struct status_t *cell) {
 void sendCommand(char version, unsigned short address, char sequence, char command) {
 	if (version == 0) {
 		sendCommandV0(address, sequence, command);
-	} else if (version == 1 || version == 2) {
-		sendCommandV1(address, sequence, command);
+	} else if (version == 1) {
+			sendCommandV1(address, sequence, command);
+	} else if (version == 2) {
+			sendCommandV2(address, sequence, command);
 	} else {
 		printf("unknown version %hhd\n", version);
 		exit(1);
@@ -613,11 +622,46 @@ void sendCommandV1(unsigned short address, char sequence, char command) {
 	writeSlowly(fd, buf, 6);
 }
 
+void sendCommandV2(unsigned short address, char sequence, unsigned char command) {
+	// we're sending "SXXSZCC"
+	crc_t crc = crc_init();
+	crc = writeCrc(START_OF_PACKET, crc);
+	crc = writeWithEscapeCrc(address & 0x00FF, crc);
+	crc = writeWithEscapeCrc((address & 0xFF00) >> 8, crc);
+	crc = writeWithEscapeCrc(sequence, crc);
+	crc = writeWithEscapeCrc(command, crc);
+	crc = crc_finalize(crc);
+	writeWithEscape(crc & 0x00FF);
+	writeWithEscape((crc & 0xFF00) >> 8);
+}
+
+crc_t writeCrc(unsigned char c, crc_t crc) {
+	writeSlowly(fd, &c, 1);
+	return crc_update(crc, &c, 1);
+}
+
+crc_t writeWithEscapeCrc(unsigned char c, crc_t crc) {
+	if (c == START_OF_PACKET || c == ESCAPE_CHARACTER) {
+		unsigned char ff = 0xff;
+		writeSlowly(fd, &ff, 1);
+	}
+	writeSlowly(fd, &c, 1);
+	return crc_update(crc, &c, 1);
+}
+
+void writeWithEscape(unsigned char c) {
+	if (c == START_OF_PACKET || c == ESCAPE_CHARACTER) {
+		unsigned char ff = 0xff;
+		writeSlowly(fd, &ff, 1);
+	}
+	writeSlowly(fd, &c, 1);
+}
+
 void writeSlowly(int fd, char *s, int length) {
 	//printf("%s\n", s);
 	for (int i = 0; i < length; i++) {
 		write(fd, s + i, 1);
-		//usleep(1000);
+		//usleep(100000);
 	}
 }
 
@@ -733,7 +777,6 @@ double asDouble(int s) {
 }
 
 unsigned char _getCellVersion(struct status_t *cell) {
-	sendCommandV1(cell->cellId, 0, '?');
 	unsigned char buf[10];
 	int actualRead = readEnough(fd, buf, 10);
 	if (actualRead != 10) {
@@ -757,12 +800,26 @@ unsigned char _getCellVersion(struct status_t *cell) {
 	return 1;
 }
 
+
+unsigned char _getCellVersion1(struct status_t *cell) {
+	sendCommandV1(cell->cellId, 0, '?');
+	return _getCellVersion(cell);
+}
+
+unsigned char _getCellVersion2(struct status_t *cell) {
+	sendCommandV2(cell->cellId, 0, '?');
+	return _getCellVersion(cell);
+}
+
 /**
  * Obtain version information about the specified cell and store it in the passed cell structure
  * @return true if version information was successfully obtained
  */
 unsigned char getCellVersion(struct status_t *cell) {
-	if (_getCellVersion(cell)) {
+	if (_getCellVersion1(cell)) {
+		return TRUE;
+	}
+	if (_getCellVersion2(cell)) {
 		return TRUE;
 	}
 	// some cells don't support getCellVersion() so we try both protocols and see which works
