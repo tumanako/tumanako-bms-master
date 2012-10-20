@@ -685,7 +685,7 @@ unsigned char _getCellVersion(struct status_t *cell) {
 	unsigned char buf[10];
 	int actualRead = readEnough(fd, buf, 10);
 	if (actualRead != 10) {
-		fprintf(stderr, "Expected 10, read %d while getting version for %d (%d)", actualRead, cell->cellIndex,
+		fprintf(stderr, "Expected 10, read %d while getting version for %d (%d)\n", actualRead, cell->cellIndex,
 				cell->cellId);
 		return 0;
 	}
@@ -694,7 +694,7 @@ unsigned char _getCellVersion(struct status_t *cell) {
 	expectedCrc = crc_finalize(expectedCrc);
 	crc_t actualCrc = bufToShortLE(buf + 8);
 	if (actualCrc != expectedCrc) {
-		fprintf(stderr, "crc missmatch %d != %d while getting version for %d (%d)", expectedCrc, actualCrc,
+		fprintf(stderr, "crc missmatch %d != %d while getting version for %d (%d)\n", expectedCrc, actualCrc,
 				cell->cellIndex, cell->cellId);
 		return 0;
 	}
@@ -734,10 +734,10 @@ void getSlaveVersions() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
-			printf("Checking cell %d (id %d) ...", j, cell->cellId);
+			printf("Checking cell %3d (id %4d) ...", j, cell->cellId);
 			cell->errorCount = 0;
 			getCellVersion(cell);
-			printf("... version %d r%d %s whenProgrammed %ld\n", cell->version, cell->revision,
+			printf("... version %2hhd r%d %s whenProgrammed %ld\n", cell->version, cell->revision,
 					cell->isClean ? "clean" : "modified", cell->whenProgrammed);
 		}
 	}
