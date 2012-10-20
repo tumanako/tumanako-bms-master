@@ -241,7 +241,6 @@ void getCellStates() {
 			char success = getCellState(cell);
 			printCellDetail(cell);
 			if (!success) {
-				cell->errorCount++;
 				continue;
 			}
 			if (!isCellShunting(cell)) {
@@ -266,6 +265,7 @@ char getCellState(struct status_t *cell) {
 	}
 	char success = _getCellState(cell, 1);
 	if (!success) {
+		cell->errorCount++;
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
 				cell->battery->name);
 		chargercontrol_shutdown();
@@ -754,7 +754,6 @@ void getSlaveVersions() {
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
 			printf("Checking cell %3d (id %4d) ...", j, cell->cellId);
-			cell->errorCount = 0;
 			getCellVersion(cell);
 			printf("... version %2hhd r%d %s whenProgrammed %ld\n", cell->version, cell->revision,
 					cell->isClean ? "clean" : "modified", cell->whenProgrammed);
@@ -797,6 +796,7 @@ void initData(struct config_t *config) {
 			cell->cellIndex = k;
 			cell->cellId = config->batteries[j].cellIds[k];
 			cell->battery = battery;
+			cell->errorCount = 0;
 		}
 	}
 }
