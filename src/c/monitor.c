@@ -77,6 +77,8 @@ unsigned short avgVoltage(struct battery_t *battery);
 unsigned int totalVoltage(struct battery_t *battery);
 void setShuntCurrent(struct config_t *config, struct battery_t *battery);
 void setMinCurrent(struct status_t *cell, unsigned short minCurrent);
+void setMinCurrent0(struct status_t *cell, unsigned short minCurrent);
+void setMinCurrent2(struct status_t *cell, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
 void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
@@ -406,6 +408,29 @@ void setShuntCurrent(struct config_t *config, struct battery_t *battery) {
 }
 
 void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
+	if (cell->version == 2) {
+		setMinCurrent2(cell, minCurrent);
+	} else {
+		setMinCurrent0(cell, minCurrent);
+	}
+}
+
+void setMinCurrent2(struct status_t *cell, unsigned short minCurrent) {
+	for (int i = 0; i < 20; i++) {
+		if (cell->minCurrent == minCurrent) {
+			return;
+		}
+		if (minCurrent < 150 || minCurrent > 450) {
+			chargercontrol_shutdown();
+			fprintf(stderr, "internal error, %d cannot be honoured by cell", minCurrent);
+		}
+		char cmd = 0x30 + minCurrent / 50;
+		sendCommand(cell->version, cell->cellId, sequenceNumber, cmd);
+		getCellState(cell);
+	}
+}
+
+void setMinCurrent0(struct status_t *cell, unsigned short minCurrent) {
 	if (cell->minCurrent == minCurrent) {
 		return;
 	}
@@ -548,7 +573,7 @@ char isCellShunting(struct status_t *cell) {
 void sendCommand(char version, unsigned short address, char sequence, char command) {
 	if (version == 0) {
 		sendCommandV0(address, sequence, command);
-	} else if (version == 1) {
+	} else if (version == 1 || version == 2) {
 		sendCommandV1(address, sequence, command);
 	} else {
 		printf("unknown version %hhd\n", version);
