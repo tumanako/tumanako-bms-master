@@ -66,6 +66,8 @@ void logger_decode3f2(struct can_frame *frame, struct logger_status_t *cells, st
 void logger_decode3f3(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
 void *logger_backgroundThread(void *ptr);
 time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short cellCount, FILE *out);
+void logMilli(FILE *out, unsigned short value, char isValid);
+int countCellsWithData(struct logger_status_t cells[], short cellCount);
 
 unsigned char logger_init(struct config_t *config) {
 	for (unsigned char i = 0; i < config->batteryCount; i++) {
@@ -113,19 +115,24 @@ void *logger_backgroundThread(void *ptr) {
 
 	time_t last = 0;
 	while (1) {
-		if (readFrame(s, &frame)) {
-			return NULL;
-		}
-		if (frame.can_id == 0x3f0) {
-			logger_decode3f0(&frame, cells, args);
-		} else if (frame.can_id == 0x3f1) {
-			logger_decode3f1(&frame, cells, args);
-		} else if (frame.can_id == 0x3f2) {
-			logger_decode3f2(&frame, cells, args);
-		} else if (frame.can_id == 0x3f3) {
-			logger_decode3f3(&frame, cells, args);
-		} else {
-			continue;
+		fd_set rfds;
+		struct timeval tv;
+		FD_ZERO(&rfds);
+		FD_SET(s, &rfds);
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+		if (select(s + 1, &rfds, NULL, NULL, &tv) > 0) {
+			if (!readFrame(s, &frame)) {
+				if (frame.can_id == 0x3f0) {
+					logger_decode3f0(&frame, cells, args);
+				} else if (frame.can_id == 0x3f1) {
+					logger_decode3f1(&frame, cells, args);
+				} else if (frame.can_id == 0x3f2) {
+					logger_decode3f2(&frame, cells, args);
+				} else if (frame.can_id == 0x3f3) {
+					logger_decode3f3(&frame, cells, args);
+				}
+			}
 		}
 		last = logger_writeLogLine(last, cells, args->cellCount, out);
 	}
@@ -135,7 +142,9 @@ void *logger_backgroundThread(void *ptr) {
 /*
  * Write a line to the log if:
  * The appropriate amount of time has passed (so we don't log too quickly)
- * All the data has been refreshed since the last line was written
+ * (All the data has been refreshed since the last line was written
+ * or
+ * the timeout has expired and we log a line with incomplete data)
  */
 time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short cellCount, FILE *out) {
 	time_t now;
@@ -145,22 +154,48 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 		return last;
 	}
 	for (int i = 0; i < cellCount; i++) {
-		if (cells[i].valued != 0x0f) {
-			// no data from at least one cell since we last wrote a line, wait some more
-			return last;
+		int thisCount = countCellsWithData(cells, cellCount);
+		if (thisCount != cellCount) {
+			// no data from at least one cell since we last wrote a line
+			if (thisCount == 0) {
+				// we haven't had any data, make sure we don't log anything until we do
+				return now;
+			}
+			if (now - last < 20) {
+				// we had complete data less than 5 seconds ago, wait some more
+				return last;
+			}
 		}
 	}
 
 	fprintf(out, "%d %.1f %.2f ", (int) now, soc_getCurrent(), soc_getAh());
 	for (int i = 0; i < cellCount; i++) {
 		struct logger_status_t *cell = cells + i;
-		fprintf(out, " %.3f %.3f", milliToDouble(cell->voltage), milliToDouble(cell->shuntCurrent));
+		logMilli(out, cell->voltage, cell->valued & 0x01);
+		logMilli(out, cell->shuntCurrent, cell->valued & 0x02);
 		cell->valued = 0;
 	}
 	fprintf(out, "\n");
 	fflush(out);
 
 	return now;
+}
+
+int countCellsWithData(struct logger_status_t cells[], short cellCount) {
+	int result = 0;
+	for (unsigned short i = 0; i < cellCount; i++) {
+		if (cells[i].valued == 0x0f) {
+			result++;
+		}
+	}
+	return result;
+}
+void logMilli(FILE *out, unsigned short value, char isValid) {
+	if (isValid) {
+		fprintf(out, " %.3f", milliToDouble(value));
+	} else {
+		fprintf(out, " -");
+	}
 }
 
 /* Decode a voltage frame. */
