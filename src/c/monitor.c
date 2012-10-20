@@ -239,6 +239,7 @@ void getCellStates() {
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
 			char success = getCellState(cell);
+			cell->isDataCurrent = success;
 			printCellDetail(cell);
 			if (!success) {
 				continue;
@@ -669,26 +670,31 @@ void printCellDetail(struct status_t *status) {
 		write(1, "\E[m", 3);
 	}
 	char isClean = !status->isClean ? '*' : ' ';
-	printf("%02d %4d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %4hd%c %5d ", status->cellIndex,
-			status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
-			asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
-			status->latency / 1000, status->revision, isClean, status->errorCount);
-	unsigned char tens;
-	unsigned char hundreds;
-	if (status->vCell < 3000) {
-		tens = 0;
-		hundreds = 0;
-	} else {
-		tens = (status->vCell / 10) % 10;
-		hundreds = (status->vCell / 100) % 10;
-	}
-	for (int j = 0; j < hundreds; j++) {
-		for (int k = 0; k < 10; k++) {
-			printf("*");
+	if (status->isDataCurrent) {
+		printf("%02d %4d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %4hd%c %5d ", status->cellIndex,
+				status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
+				asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
+				status->latency / 1000, status->revision, isClean, status->errorCount);
+		unsigned char tens;
+		unsigned char hundreds;
+		if (status->vCell < 3000) {
+			tens = 0;
+			hundreds = 0;
+		} else {
+			tens = (status->vCell / 10) % 10;
+			hundreds = (status->vCell / 100) % 10;
 		}
-	}
-	for (int j = 0; j < tens; j++) {
-		printf("-");
+		for (int j = 0; j < hundreds; j++) {
+			for (int k = 0; k < 10; k++) {
+				printf("*");
+			}
+		}
+		for (int j = 0; j < tens; j++) {
+			printf("-");
+		}
+	} else {
+		printf("%02d %4d Bad Data                                                 %4hhd%c %5d ", status->cellIndex,
+				status->cellId, status->revision, isClean, status->errorCount);
 	}
 	write(1, "\E[K", 3);
 	printf("\n");
@@ -797,6 +803,7 @@ void initData(struct config_t *config) {
 			cell->cellId = config->batteries[j].cellIds[k];
 			cell->battery = battery;
 			cell->errorCount = 0;
+			cell->isDataCurrent = FALSE;
 		}
 	}
 }

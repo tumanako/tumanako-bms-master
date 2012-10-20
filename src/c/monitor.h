@@ -48,6 +48,8 @@ struct status_t {
 	unsigned char isClean;
 	unsigned long whenProgrammed;
 	unsigned short errorCount;
+	// true if we have current data for this cell
+	unsigned short isDataCurrent;
 };
 
 struct battery_t {
