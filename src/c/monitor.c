@@ -61,6 +61,7 @@
 
 #define ESCAPE_CHARACTER 0xff
 #define START_OF_PACKET 0xfe
+#define EVD5_BINSTATUS_2_LENGTH 21
 
 void initData(struct config_t *config);
 void sendCommand(char version, unsigned short address, char sequence, char command);
@@ -69,12 +70,15 @@ void sendCommandV1(unsigned short address, char sequenceNumber, char command);
 void sendCommandV2(unsigned short address, char sequenceNumber, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
-char _getCellState(struct status_t *status, int attempts);
+char _getCellState0(struct status_t *status, int attempts);
+char _getCellState2(struct status_t *status, int attempts);
+void decodeBinStatus(unsigned char *buf, struct status_t *to);
 void writeSlowly(int fd, char *s, int length);
 crc_t writeCrc(unsigned char c, crc_t crc);
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc);
 void writeWithEscape(unsigned char c);
 int readEnough(int fd, unsigned char *buf, int length);
+unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned char length, struct timeval *end);
 unsigned short maxVoltageInAnyBattery();
 unsigned short maxVoltage(struct battery_t *battery);
 unsigned short maxVoltageCell(struct battery_t *battery);
@@ -272,7 +276,15 @@ char getCellState(struct status_t *cell) {
 			return FALSE;
 		}
 	}
-	char success = _getCellState(cell, 2);
+	char success;
+	if (cell->version == 0 || cell->version == 1) {
+		success = _getCellState0(cell, 2);
+	} else if (cell->version == 2) {
+		success = _getCellState2(cell, 2);
+	} else {
+		fprintf(stderr, "unknown version %d\n", cell->version);
+		exit(1);
+	}
 	if (!success) {
 		cell->errorCount++;
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
@@ -283,7 +295,7 @@ char getCellState(struct status_t *cell) {
 	return TRUE;
 }
 
-char _getCellState(struct status_t *status, int maxAttempts) {
+char _getCellState0(struct status_t *status, int maxAttempts) {
 	int actualLength = 0;
 	for (int attempt = 0; TRUE; attempt++) {
 		if (attempt >= maxAttempts) {
@@ -349,6 +361,105 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		break;
 	}
 	return 1;
+}
+
+char _getCellState2(struct status_t *status, int maxAttempts) {
+	for (int attempt = 0; TRUE; attempt++) {
+		if (attempt >= maxAttempts) {
+			return 0;
+			fprintf(stderr, "%d bus errors, exiting\n", attempt);
+			chargercontrol_shutdown();
+			exit(1);
+		}
+		if (attempt > 0) {
+			fprintf(stderr, "no response from %d (id %d) in %s, resetting\n", status->cellIndex, status->cellId,
+					status->battery->name);
+			buscontrol_setBus(FALSE);
+			buscontrol_setBus(TRUE);
+		}
+		unsigned char buf[EVD5_BINSTATUS_2_LENGTH];
+		unsigned char sentSequenceNumber;
+		sentSequenceNumber = sequenceNumber++;
+		struct timeval start, end;
+		gettimeofday(&start, NULL);
+		sendCommand(status->version, status->cellId, sentSequenceNumber, '/');
+		if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
+			continue;
+		}
+		unsigned short recievedCellId =	bufToShortLE(buf + 1);
+		if (status->cellId != recievedCellId) {
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n", status->cellIndex,
+					status->cellId, status->battery->name, recievedCellId);
+			dumpBuffer(buf, EVD5_BINSTATUS_2_LENGTH);
+			flushInputBuffer();
+			continue;
+		}
+		unsigned char recievedSequenceNumber = buf[13];
+		if (sentSequenceNumber != recievedSequenceNumber) {
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s with seq 0x%02x but received seq 0x%02hhx\n",
+					status->cellIndex, status->cellId, status->battery->name, sentSequenceNumber,
+					recievedSequenceNumber);
+			dumpBuffer(buf, EVD5_BINSTATUS_2_LENGTH);
+			flushInputBuffer();
+			continue;
+		}
+		decodeBinStatus(buf, status);
+		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+		break;
+	}
+	return 1;
+}
+
+unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned char length, struct timeval *end) {
+	unsigned char actualLength = 0;
+	unsigned char escape = FALSE;
+	while (actualLength != length) {
+		if (!readEnough(fd, buf + actualLength, 1)) {
+			fprintf(stderr, "read %d, expected %d from cell %d (id %2d) in %s\n", actualLength, length,
+					cell->cellIndex, cell->cellId, cell->battery->name);
+			dumpBuffer(buf, actualLength);
+			return 0;
+		}
+		unsigned char read = buf[actualLength];
+		if (read == 0xff && !escape) {
+			escape = TRUE;
+			continue;
+		}
+		if (actualLength == 0) {
+			if (read == 0xfe && !escape) {
+				actualLength++;
+			}
+			continue;
+		}
+		escape = FALSE;
+		actualLength++;
+	}
+	gettimeofday(end, NULL);
+	crc_t actualCrc = crc_init();
+	actualCrc = crc_update(actualCrc, buf, length - 2);
+	actualCrc = crc_finalize(actualCrc);
+	unsigned short *receivedCrc = (unsigned short *) (buf + length - sizeof(crc_t));
+	if (actualCrc != *receivedCrc) {
+		fprintf(stderr, "\nSent message to %2d (id %2d) in %s, received CRC 0x%04x calculated 0x%04x\n", cell->cellIndex,
+				cell->cellId, cell->battery->name, *receivedCrc, actualCrc);
+		dumpBuffer(buf, actualLength);
+		return 0;
+	}
+	return actualLength;
+}
+
+void decodeBinStatus(unsigned char *buf, struct status_t *to) {
+	to->iShunt = bufToShortLE(buf + 3);
+	to->vCell = bufToShortLE(buf + 5);
+	to->vShunt = bufToShortLE(buf + 7);
+	to->temperature = bufToShortLE(buf + 9);
+	to->minCurrent = bufToShortLE(buf + 11);
+	to->sequenceNumber = buf[13];
+	to->gainPot = buf[14];
+	to->vShuntPot = buf[15];
+	to->hasRx = buf[16];
+	to->softwareAddressing = buf[17];
+	to->automatic = buf[18];
 }
 
 void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
@@ -776,7 +887,8 @@ double asDouble(int s) {
 	return ((double) s) / 1000;
 }
 
-unsigned char _getCellVersion(struct status_t *cell) {
+unsigned char _getCellVersion1(struct status_t *cell) {
+	sendCommandV1(cell->cellId, 0, '?');
 	unsigned char buf[10];
 	int actualRead = readEnough(fd, buf, 10);
 	if (actualRead != 10) {
@@ -800,15 +912,23 @@ unsigned char _getCellVersion(struct status_t *cell) {
 	return 1;
 }
 
-
-unsigned char _getCellVersion1(struct status_t *cell) {
-	sendCommandV1(cell->cellId, 0, '?');
-	return _getCellVersion(cell);
-}
-
 unsigned char _getCellVersion2(struct status_t *cell) {
 	sendCommandV2(cell->cellId, 0, '?');
-	return _getCellVersion(cell);
+	unsigned char buf[13];
+	struct timeval end;
+	if (!readPacket(cell, buf, 13, &end)) {
+		return FALSE;
+	}
+	short cellId = bufToShortLE(buf + 1);
+	if (cell->cellId != cellId) {
+		fprintf(stderr, "sent getVersion to %4d, got reply from %4d\n", cell->cellId, cellId);
+		return 0;
+	}
+	cell->version = buf[3];
+	cell->revision = bufToShortLE(buf + 4);
+	cell->isClean = buf[6];
+	cell->whenProgrammed = bufToLongLE(buf + 7);
+	return 1;
 }
 
 /**
@@ -816,19 +936,19 @@ unsigned char _getCellVersion2(struct status_t *cell) {
  * @return true if version information was successfully obtained
  */
 unsigned char getCellVersion(struct status_t *cell) {
-	if (_getCellVersion1(cell)) {
+	if (_getCellVersion2(cell)) {
 		return TRUE;
 	}
-	if (_getCellVersion2(cell)) {
+	if (_getCellVersion1(cell)) {
 		return TRUE;
 	}
 	// some cells don't support getCellVersion() so we try both protocols and see which works
 	cell->version = 0;
-	if (_getCellState(cell, 1)) {
+	if (_getCellState0(cell, 1)) {
 		return TRUE;
 	}
 	cell->version = 1;
-	if (_getCellState(cell, 1)) {
+	if (_getCellState0(cell, 1)) {
 		return TRUE;
 	}
 	fprintf(stderr, "error getting version for cell %d (id %d)\n", cell->cellIndex, cell->cellId);
@@ -853,19 +973,12 @@ void getSlaveVersions() {
 
 void findCells() {
 	struct status_t status;
+	struct battery_t battery;
+	battery.name = "findCells";
+	status.battery = &battery;
 	for (unsigned short i = 0; i < 255; i++) {
 		status.cellId = i;
-		status.version = 0;
-		unsigned char found = 0;
-		if (_getCellState(&status, 1)) {
-			found = TRUE;
-		} else {
-			status.version = 1;
-			if (!_getCellState(&status, 1)) {
-				found = TRUE;
-			}
-		}
-		if (found) {
+		if (getCellVersion(&status)) {
 			printf("found cell at %d\n", i);
 		} else {
 			printf("found nothing at %d\n", i);
