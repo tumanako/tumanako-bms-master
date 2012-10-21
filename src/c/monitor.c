@@ -171,6 +171,7 @@ int main() {
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			sendCommand(0, battery->cells[j].cellId, seq++, 'r');
 			sendCommand(1, battery->cells[j].cellId, seq++, 'r');
+			sendCommand(2, battery->cells[j].cellId, seq++, 'r');
 		}
 	}
 
