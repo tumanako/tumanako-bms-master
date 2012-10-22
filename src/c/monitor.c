@@ -97,6 +97,8 @@ void flushInputBuffer();
 unsigned char getCellVersion(struct status_t *cell);
 void getSlaveVersions();
 
+unsigned char shuntPause = 0;
+
 int fd;
 
 struct monitor_t data;
@@ -222,6 +224,7 @@ int main() {
 			shutdown = 1;
 		}
 		printSummary();
+		shuntPause = FALSE;
 		unsigned char shuntValueChanged = FALSE;
 		for (unsigned char i = 0; i < data.batteryCount; i++) {
 			shuntValueChanged |= setShuntCurrent(config, &data.batteries[i]);
@@ -263,7 +266,9 @@ void getCellStates() {
 				// the voltage doesn't mean much when we are drawing current
 				montiorCan_sendCellVoltage(i, j, cell->vCell);
 			}
-			monitorCan_sendShuntCurrent(i, j, cell->iShunt);
+			if (!shuntPause) {
+				monitorCan_sendShuntCurrent(i, j, cell->iShunt);
+			}
 			monitorCan_sendMinCurrent(i, j, cell->minCurrent);
 			monitorCan_sendTemperature(i, j, cell->temperature);
 		}
@@ -376,7 +381,9 @@ unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned cha
 }
 
 void decodeBinStatus(unsigned char *buf, struct status_t *to) {
-	to->iShunt = bufToShortLE(buf + 3);
+	if (!shuntPause) {
+		to->iShunt = bufToShortLE(buf + 3);
+	}
 	if (!isCellShunting(to)) {
 		to->vCell = bufToShortLE(buf + 5);
 	}
