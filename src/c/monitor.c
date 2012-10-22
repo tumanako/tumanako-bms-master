@@ -547,7 +547,8 @@ char isAnyCellShunting() {
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
-			if (battery->cells[j].targetShuntCurrent > 0) {
+			if (battery->cells[j].targetShuntCurrent > 0 ||
+					battery->cells[j].minCurrent > 0) {
 				return 1;
 			}
 		}
