@@ -377,7 +377,9 @@ unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned cha
 
 void decodeBinStatus(unsigned char *buf, struct status_t *to) {
 	to->iShunt = bufToShortLE(buf + 3);
-	to->vCell = bufToShortLE(buf + 5);
+	if (!isCellShunting(to)) {
+		to->vCell = bufToShortLE(buf + 5);
+	}
 	to->vShunt = bufToShortLE(buf + 7);
 	to->temperature = bufToShortLE(buf + 9);
 	to->minCurrent = bufToShortLE(buf + 11);
