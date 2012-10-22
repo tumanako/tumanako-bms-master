@@ -69,7 +69,7 @@ void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
 void decodeBinStatus(unsigned char *buf, struct status_t *to);
-void writeSlowly(int fd, char *s, int length);
+void writeSlowly(int fd, unsigned char *s, int length);
 crc_t writeCrc(unsigned char c, crc_t crc);
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc);
 void writeWithEscape(unsigned char c);
@@ -159,8 +159,8 @@ int main() {
 
 	char seq = '0';
 
-	// send some bytes to wake up the slaves
-	writeSlowly(fd, "garbage", 7);
+	// send a byte to wake up the slaves
+	writeWithEscape('a');
 
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
@@ -172,7 +172,7 @@ int main() {
 	sleep(1);
 
 	// send some bytes to wake up the slaves (they drop characters while flashing the light)
-	writeSlowly(fd, "garbage", 7);
+	writeWithEscape('a');
 
 	// findCells();
 
@@ -195,7 +195,7 @@ int main() {
 		}
 		if (config->loopDelay > 30) {
 			// if the slaves have gone to sleep, send some characters to wake them up
-			writeSlowly(fd, "garbage", 7);
+			writeWithEscape('a');
 			// wait for slaves to wake up and take a measurement
 			sleep(2);
 		}
@@ -621,7 +621,7 @@ void writeWithEscape(unsigned char c) {
 	writeSlowly(fd, &c, 1);
 }
 
-void writeSlowly(int fd, char *s, int length) {
+void writeSlowly(int fd, unsigned char *s, int length) {
 	//printf("%s\n", s);
 	for (int i = 0; i < length; i++) {
 		write(fd, s + i, 1);
