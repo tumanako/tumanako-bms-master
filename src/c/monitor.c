@@ -82,15 +82,15 @@ unsigned short minVoltage(struct battery_t *battery);
 unsigned short minVoltageCell(struct battery_t *battery);
 unsigned short avgVoltage(struct battery_t *battery);
 unsigned int totalVoltage(struct battery_t *battery);
-void setShuntCurrent(struct config_t *config, struct battery_t *battery);
-void setMinCurrent(struct status_t *cell, unsigned short minCurrent);
+unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery);
+unsigned char setMinCurrent(struct status_t *cell, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
 void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
 void printSummary();
 void printCellDetail(struct status_t *status);
 double asDouble(int s);
-void turnOffAllShunts();
+unsigned char turnOffAllShunts();
 char isAnyCellShunting();
 char isCellShunting(struct status_t *cell);
 void flushInputBuffer();
@@ -219,8 +219,13 @@ int main() {
 			shutdown = 1;
 		}
 		printSummary();
+		unsigned char shuntValueChanged = FALSE;
 		for (unsigned char i = 0; i < data.batteryCount; i++) {
-			setShuntCurrent(config, &data.batteries[i]);
+			shuntValueChanged |= setShuntCurrent(config, &data.batteries[i]);
+		}
+		if (shuntValueChanged) {
+			// give cells a chance re-read
+			sleep(1);
 		}
 		fflush(NULL);
 
@@ -399,25 +404,20 @@ void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
 }
 
 /** turn shunting off on any cells that are shunting */
-void turnOffAllShunts() {
-	char changed = 0;
+unsigned char turnOffAllShunts() {
+	unsigned char changed = 0;
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
-			if (cell->minCurrent != 0 || cell->targetShuntCurrent != 0) {
-				setMinCurrent(cell, 0);
-				changed = 1;
-			}
+			changed |= setMinCurrent(cell, 0);
 		}
 	}
-	if (changed) {
-		// give slaves time to process
-		sleep(2);
-	}
+	return changed;
 }
 
-void setShuntCurrent(struct config_t *config, struct battery_t *battery) {
+unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery) {
+	unsigned char changed = FALSE;
 	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		struct status_t *cell = battery->cells + i;
 		unsigned short target;
@@ -440,14 +440,19 @@ void setShuntCurrent(struct config_t *config, struct battery_t *battery) {
 		if (target < config->minShuntCurrent) {
 			target = config->minShuntCurrent;
 		}
-		setMinCurrent(cell, target);
+		changed |= setMinCurrent(cell, target);
 	}
+	return changed;
 }
 
-void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
+unsigned char setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
+	if (cell->minCurrent == minCurrent && cell->targetShuntCurrent == minCurrent) {
+		return FALSE;
+	}
+	cell->targetShuntCurrent = minCurrent;
 	for (int i = 0; i < 20; i++) {
 		if (cell->minCurrent == minCurrent) {
-			return;
+			return TRUE;
 		}
 		if (minCurrent != 0 && (minCurrent < 150 || minCurrent > 450)) {
 			chargercontrol_shutdown();
@@ -462,6 +467,7 @@ void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 	chargercontrol_shutdown();
 	fprintf(stderr, "%2d (id %2d) in %s trying to get to %d but had %d\n", cell->cellIndex, cell->cellId,
 			cell->battery->name, minCurrent, cell->minCurrent);
+	return FALSE;
 }
 
 unsigned short minVoltage(struct battery_t *battery) {
