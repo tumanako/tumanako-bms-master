@@ -67,8 +67,7 @@ void initData(struct config_t *config);
 void sendCommand(unsigned short address, char sequence, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
-char _getCellState0(struct status_t *status, int attempts);
-char _getCellState2(struct status_t *status, int attempts);
+char _getCellState(struct status_t *status, int attempts);
 void decodeBinStatus(unsigned char *buf, struct status_t *to);
 void writeSlowly(int fd, char *s, int length);
 crc_t writeCrc(unsigned char c, crc_t crc);
@@ -272,15 +271,7 @@ char getCellState(struct status_t *cell) {
 			return FALSE;
 		}
 	}
-	char success;
-	if (cell->version == 0 || cell->version == 1) {
-		success = _getCellState0(cell, 2);
-	} else if (cell->version == 2) {
-		success = _getCellState2(cell, 2);
-	} else {
-		fprintf(stderr, "unknown version %d\n", cell->version);
-		exit(1);
-	}
+	char success = _getCellState(cell, 2);
 	if (!success) {
 		cell->errorCount++;
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
@@ -291,75 +282,7 @@ char getCellState(struct status_t *cell) {
 	return TRUE;
 }
 
-char _getCellState0(struct status_t *status, int maxAttempts) {
-	int actualLength = 0;
-	for (int attempt = 0; TRUE; attempt++) {
-		if (attempt >= maxAttempts) {
-			return 0;
-			fprintf(stderr, "%d bus errors, exiting\n", attempt);
-			chargercontrol_shutdown();
-			exit(1);
-		}
-		if (attempt > 0 && actualLength == 0) {
-			fprintf(stderr, "no response from %d (id %d) in %s, resetting\n", status->cellIndex, status->cellId,
-					status->battery->name);
-			buscontrol_setBus(FALSE);
-			buscontrol_setBus(TRUE);
-		}
-		unsigned char buf[EVD5_STATUS_LENGTH];
-		unsigned char sentSequenceNumber;
-		sentSequenceNumber = sequenceNumber++;
-		struct timeval start;
-		gettimeofday(&start, NULL);
-		sendCommand(status->cellId, sentSequenceNumber, '/');
-		actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
-		struct timeval end;
-		gettimeofday(&end, NULL);
-		if (actualLength != EVD5_STATUS_LENGTH) {
-			fprintf(stderr, "read %d, expected %d from cell %d (id %2d) in %s\n", actualLength, EVD5_STATUS_LENGTH,
-					status->cellIndex, status->cellId, status->battery->name);
-			dumpBuffer(buf, actualLength);
-			flushInputBuffer();
-			continue;
-		}
-		unsigned short *actualCRC = (unsigned short *) (buf + EVD5_STATUS_LENGTH - sizeof(crc_t));
-		crc_t expectedCRC = crc_init();
-		expectedCRC = crc_update(expectedCRC, buf, EVD5_STATUS_LENGTH - sizeof(crc_t));
-		expectedCRC = crc_finalize(expectedCRC);
-		if (expectedCRC != *actualCRC) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) in %s, expected CRC 0x%04x got 0x%04x\n", status->cellIndex,
-					status->cellId, status->battery->name, expectedCRC, *actualCRC);
-			dumpBuffer(buf, actualLength);
-			flushInputBuffer();
-			continue;
-		}
-		struct evd5_status_t evd5Status;
-		memcpy(&evd5Status, buf, EVD5_STATUS_LENGTH);
-		// have to copy this one separately because of padding
-		evd5Status.crc = *actualCRC;
-		if (evd5Status.cellAddress != status->cellId) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n", status->cellIndex,
-					status->cellId, status->battery->name, evd5Status.cellAddress);
-			dumpBuffer(buf, actualLength);
-			flushInputBuffer();
-			continue;
-		}
-		if (evd5Status.sequenceNumber != sentSequenceNumber) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) in %s with seq 0x%02x but received seq 0x%02hhx\n",
-					status->cellIndex, status->cellId, status->battery->name, sentSequenceNumber,
-					evd5Status.sequenceNumber);
-			dumpBuffer(buf, actualLength);
-			flushInputBuffer();
-			continue;
-		}
-		evd5ToStatus(&evd5Status, status);
-		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
-		break;
-	}
-	return 1;
-}
-
-char _getCellState2(struct status_t *status, int maxAttempts) {
+char _getCellState(struct status_t *status, int maxAttempts) {
 	for (int attempt = 0; TRUE; attempt++) {
 		if (attempt >= maxAttempts) {
 			return 0;
