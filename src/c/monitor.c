@@ -447,9 +447,10 @@ void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 		if (cell->minCurrent == minCurrent) {
 			return;
 		}
-		if (minCurrent < 150 || minCurrent > 450) {
+		if (minCurrent != 0 && (minCurrent < 150 || minCurrent > 450)) {
 			chargercontrol_shutdown();
 			fprintf(stderr, "internal error, %d cannot be honoured by cell", minCurrent);
+			exit(1);
 		}
 		char cmd = 0x30 + minCurrent / 50;
 		sendCommand(cell->cellId, sequenceNumber, cmd);
@@ -457,7 +458,6 @@ void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 	}
 	// couldn't get to desired current after 20 attempts???
 	chargercontrol_shutdown();
-	getCellState(cell);
 	fprintf(stderr, "%2d (id %2d) in %s trying to get to %d but had %d\n", cell->cellIndex, cell->cellId,
 			cell->battery->name, minCurrent, cell->minCurrent);
 }
