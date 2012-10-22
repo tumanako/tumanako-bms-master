@@ -64,10 +64,7 @@
 #define EVD5_BINSTATUS_2_LENGTH 21
 
 void initData(struct config_t *config);
-void sendCommand(char version, unsigned short address, char sequence, char command);
-void sendCommandV0(unsigned short address, char sequenceNumber, char command);
-void sendCommandV1(unsigned short address, char sequenceNumber, char command);
-void sendCommandV2(unsigned short address, char sequenceNumber, unsigned char command);
+void sendCommand(unsigned short address, char sequence, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState0(struct status_t *status, int attempts);
@@ -169,9 +166,7 @@ int main() {
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
-			sendCommand(0, battery->cells[j].cellId, seq++, 'r');
-			sendCommand(1, battery->cells[j].cellId, seq++, 'r');
-			sendCommand(2, battery->cells[j].cellId, seq++, 'r');
+			sendCommand(battery->cells[j].cellId, seq++, 'r');
 		}
 	}
 
@@ -316,7 +311,7 @@ char _getCellState0(struct status_t *status, int maxAttempts) {
 		sentSequenceNumber = sequenceNumber++;
 		struct timeval start;
 		gettimeofday(&start, NULL);
-		sendCommand(status->version, status->cellId, sentSequenceNumber, '/');
+		sendCommand(status->cellId, sentSequenceNumber, '/');
 		actualLength = readEnough(fd, buf, EVD5_STATUS_LENGTH);
 		struct timeval end;
 		gettimeofday(&end, NULL);
@@ -383,7 +378,7 @@ char _getCellState2(struct status_t *status, int maxAttempts) {
 		sentSequenceNumber = sequenceNumber++;
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
-		sendCommand(status->version, status->cellId, sentSequenceNumber, '/');
+		sendCommand(status->cellId, sentSequenceNumber, '/');
 		if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
 			continue;
 		}
@@ -544,7 +539,7 @@ void setMinCurrent2(struct status_t *cell, unsigned short minCurrent) {
 			fprintf(stderr, "internal error, %d cannot be honoured by cell", minCurrent);
 		}
 		char cmd = 0x30 + minCurrent / 50;
-		sendCommand(cell->version, cell->cellId, sequenceNumber, cmd);
+		sendCommand(cell->cellId, sequenceNumber, cmd);
 		getCellState(cell);
 	}
 }
@@ -572,7 +567,7 @@ void setMinCurrent0(struct status_t *cell, unsigned short minCurrent) {
 			// if we don't know the verison then we can't send commands
 			return;
 		}
-		sendCommand(cell->version, cell->cellId, '0', command);
+		sendCommand(cell->cellId, '0', command);
 		readEnough(fd, buf, 7);
 		buf[6] = 0;
 		char *endPtr;
@@ -689,52 +684,7 @@ char isCellShunting(struct status_t *cell) {
 	return 0;
 }
 
-void sendCommand(char version, unsigned short address, char sequence, char command) {
-	if (version == 0) {
-		sendCommandV0(address, sequence, command);
-	} else if (version == 1) {
-			sendCommandV1(address, sequence, command);
-	} else if (version == 2) {
-			sendCommandV2(address, sequence, command);
-	} else {
-		printf("unknown version %hhd\n", version);
-		exit(1);
-	}
-}
-
-void sendCommandV0(unsigned short address, char sequence, char command) {
-	char buf[] = "heloXXYX";
-	// little endian
-	buf[4] = (char) address & 0x00FF;
-	buf[5] = (char) ((address & 0xFF00) >> 8);
-	buf[6] = sequence;
-	buf[7] = command;
-	if (DEBUG) {
-		fprintf(stderr, "sending command '%c' to 0x%02x%02x with seq %02x\n", buf[7], buf[4], buf[5], sequence);
-	}
-	writeSlowly(fd, buf, 8);
-}
-
-void sendCommandV1(unsigned short address, char sequence, char command) {
-	char buf[6] = "XXYZCC";
-	// little endian
-	buf[0] = (char) address & 0x00FF;
-	buf[1] = (char) ((address & 0xFF00) >> 8);
-	buf[2] = sequence;
-	buf[3] = command;
-	crc_t crc = crc_init();
-	crc = crc_update(crc, (unsigned char *) buf, 4);
-	crc = crc_finalize(crc);
-	buf[4] = (char) crc & 0x00FF;
-	buf[5] = (char) ((crc & 0xFF00) >> 8);
-	if (DEBUG) {
-		fprintf(stderr, "sending command '%c' to 0x%02x%02x with CRC 0x%02x%02x\n", buf[3], buf[0], buf[1], buf[4],
-				buf[5]);
-	}
-	writeSlowly(fd, buf, 6);
-}
-
-void sendCommandV2(unsigned short address, char sequence, unsigned char command) {
+void sendCommand(unsigned short address, char sequence, unsigned char command) {
 	// we're sending "SXXSZCC"
 	crc_t crc = crc_init();
 	crc = writeCrc(START_OF_PACKET, crc);
@@ -889,7 +839,7 @@ double asDouble(int s) {
 }
 
 unsigned char _getCellVersion(struct status_t *cell) {
-	sendCommandV2(cell->cellId, 0, '?');
+	sendCommand(cell->cellId, 0, '?');
 	unsigned char buf[13];
 	struct timeval end;
 	if (!readPacket(cell, buf, 13, &end)) {
