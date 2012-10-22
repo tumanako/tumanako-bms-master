@@ -175,6 +175,8 @@ int main() {
 	// findCells();
 
 	getSlaveVersions();
+	turnOffAllShunts();
+	sleep(1);
 
 	// clear the screen
 	write(1, "\E[H\E[2J", 7);
@@ -798,6 +800,7 @@ void initData(struct config_t *config) {
 			cell->battery = battery;
 			cell->errorCount = 0;
 			cell->isDataCurrent = FALSE;
+			cell->minCurrent = 999;
 		}
 	}
 }
