@@ -199,7 +199,10 @@ int main() {
 		}
 		last = t;
 		if (!HAS_KELVIN_CONNECTION) {
-			turnOffAllShunts();
+			if (turnOffAllShunts()) {
+				shuntPause = TRUE;
+				sleep(1);
+			}
 		}
 		getCellStates();
 		if (maxVoltageInAnyBattery() > CHARGER_OFF_VOLTAGE) {
