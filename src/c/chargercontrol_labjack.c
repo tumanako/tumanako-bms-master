@@ -117,7 +117,7 @@ int setWatchdog(HANDLE hDevice, char reset) {
 		sendBuff[7] = 0x00; // don't reset
 	}
 	if (reset) {
-		sendBuff[8] = 0x0A; // timeout MSB
+		sendBuff[8] = 0x30; // timeout MSB
 		sendBuff[9] = 0x00; // timeout LSB
 	} else {
 		sendBuff[8] = 0xff; // timeout MSB

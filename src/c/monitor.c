@@ -888,32 +888,7 @@ double asDouble(int s) {
 	return ((double) s) / 1000;
 }
 
-unsigned char _getCellVersion1(struct status_t *cell) {
-	sendCommandV1(cell->cellId, 0, '?');
-	unsigned char buf[10];
-	int actualRead = readEnough(fd, buf, 10);
-	if (actualRead != 10) {
-		fprintf(stderr, "Expected 10, read %d while getting version for %d (%d)\n", actualRead, cell->cellIndex,
-				cell->cellId);
-		return 0;
-	}
-	crc_t expectedCrc = crc_init();
-	expectedCrc = crc_update(expectedCrc, buf, 8);
-	expectedCrc = crc_finalize(expectedCrc);
-	crc_t actualCrc = bufToShortLE(buf + 8);
-	if (actualCrc != expectedCrc) {
-		fprintf(stderr, "crc missmatch %d != %d while getting version for %d (%d)\n", expectedCrc, actualCrc,
-				cell->cellIndex, cell->cellId);
-		return 0;
-	}
-	cell->version = buf[0];
-	cell->revision = bufToShortLE(buf + 1);
-	cell->isClean = buf[3];
-	cell->whenProgrammed = bufToLongLE(buf + 4);
-	return 1;
-}
-
-unsigned char _getCellVersion2(struct status_t *cell) {
+unsigned char _getCellVersion(struct status_t *cell) {
 	sendCommandV2(cell->cellId, 0, '?');
 	unsigned char buf[13];
 	struct timeval end;
@@ -937,20 +912,10 @@ unsigned char _getCellVersion2(struct status_t *cell) {
  * @return true if version information was successfully obtained
  */
 unsigned char getCellVersion(struct status_t *cell) {
-	if (_getCellVersion2(cell)) {
-		return TRUE;
-	}
-	if (_getCellVersion1(cell)) {
-		return TRUE;
-	}
-	// some cells don't support getCellVersion() so we try both protocols and see which works
-	cell->version = 0;
-	if (_getCellState0(cell, 1)) {
-		return TRUE;
-	}
-	cell->version = 1;
-	if (_getCellState0(cell, 1)) {
-		return TRUE;
+	for (int i = 0; i < 3; i++) {
+		if (_getCellVersion(cell)) {
+			return TRUE;
+		}
 	}
 	fprintf(stderr, "error getting version for cell %d (id %d)\n", cell->cellIndex, cell->cellId);
 	cell->errorCount++;
