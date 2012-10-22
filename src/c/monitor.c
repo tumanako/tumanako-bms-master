@@ -84,8 +84,6 @@ unsigned short avgVoltage(struct battery_t *battery);
 unsigned int totalVoltage(struct battery_t *battery);
 void setShuntCurrent(struct config_t *config, struct battery_t *battery);
 void setMinCurrent(struct status_t *cell, unsigned short minCurrent);
-void setMinCurrent0(struct status_t *cell, unsigned short minCurrent);
-void setMinCurrent2(struct status_t *cell, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
 void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
@@ -445,14 +443,6 @@ void setShuntCurrent(struct config_t *config, struct battery_t *battery) {
 }
 
 void setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
-	if (cell->version == 2) {
-		setMinCurrent2(cell, minCurrent);
-	} else {
-		setMinCurrent0(cell, minCurrent);
-	}
-}
-
-void setMinCurrent2(struct status_t *cell, unsigned short minCurrent) {
 	for (int i = 0; i < 20; i++) {
 		if (cell->minCurrent == minCurrent) {
 			return;
@@ -465,43 +455,11 @@ void setMinCurrent2(struct status_t *cell, unsigned short minCurrent) {
 		sendCommand(cell->cellId, sequenceNumber, cmd);
 		getCellState(cell);
 	}
-}
-
-void setMinCurrent0(struct status_t *cell, unsigned short minCurrent) {
-	if (cell->minCurrent == minCurrent) {
-		return;
-	}
-	char command;
-	unsigned char buf[7];
-	if (minCurrent > SHUNT_MAX_CURRENT) {
-		minCurrent = SHUNT_MAX_CURRENT;
-	}
-	cell->targetShuntCurrent = minCurrent;
-	int actual = SHUNT_MAX_CURRENT + 1;
-	for (int i = 0; i < 20; i++) {
-		if (actual > minCurrent) {
-			command = '<';
-		} else if (actual < minCurrent) {
-			command = '>';
-		} else {
-			return;
-		}
-		if (cell->version == (char) -1) {
-			// if we don't know the verison then we can't send commands
-			return;
-		}
-		sendCommand(cell->cellId, '0', command);
-		readEnough(fd, buf, 7);
-		buf[6] = 0;
-		char *endPtr;
-		actual = strtol((char *) buf, &endPtr, 10);
-	}
-	// couldn't get to desired current after 10 attempts???
+	// couldn't get to desired current after 20 attempts???
 	chargercontrol_shutdown();
 	getCellState(cell);
-	fprintf(stderr, "%2d (id %2d) in %s trying to get to %d but had %d actual = %d\n", cell->cellIndex, cell->cellId,
-			cell->battery->name, minCurrent, cell->minCurrent, actual);
-	exit(1);
+	fprintf(stderr, "%2d (id %2d) in %s trying to get to %d but had %d\n", cell->cellIndex, cell->cellId,
+			cell->battery->name, minCurrent, cell->minCurrent);
 }
 
 unsigned short minVoltage(struct battery_t *battery) {
