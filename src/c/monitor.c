@@ -68,7 +68,8 @@ void sendCommand(struct status_t *cell, char sequence, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
-void decodeBinStatus(unsigned char *buf, struct status_t *to);
+void decodeBinStatus2(unsigned char *buf, struct status_t *to);
+void decodeBinStatus3(unsigned char *buf, struct status_t *to);
 void writeSlowly(int fd, unsigned char *s, int length);
 crc_t writeCrc(unsigned char c, crc_t crc);
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc);
@@ -166,6 +167,9 @@ int main() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
+			cell->version = 2;
+			sendCommand(cell, seq++, 'r');
+			cell->version = 3;
 			sendCommand(cell, seq++, 'r');
 		}
 	}
@@ -316,8 +320,14 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
 		sendCommand(status, sentSequenceNumber, '/');
-		if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
-			continue;
+		if (status->version == 2) {
+			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
+				continue;
+			}
+		} else {
+			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH - 1, &end)) {
+				continue;
+			}
 		}
 		unsigned short recievedCellId =	bufToShortLE(buf + 1);
 		if (status->cellId != recievedCellId) {
@@ -327,16 +337,11 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 			flushInputBuffer();
 			continue;
 		}
-		unsigned char recievedSequenceNumber = buf[13];
-		if (sentSequenceNumber != recievedSequenceNumber) {
-			fprintf(stderr, "\nSent message to %2d (id %2d) in %s with seq 0x%02x but received seq 0x%02hhx\n",
-					status->cellIndex, status->cellId, status->battery->name, sentSequenceNumber,
-					recievedSequenceNumber);
-			dumpBuffer(buf, EVD5_BINSTATUS_2_LENGTH);
-			flushInputBuffer();
-			continue;
+		if (status->version == 2) {
+			decodeBinStatus2(buf, status);
+		} else {
+			decodeBinStatus3(buf, status);
 		}
-		decodeBinStatus(buf, status);
 		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 		break;
 	}
@@ -381,7 +386,7 @@ unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned cha
 	return actualLength;
 }
 
-void decodeBinStatus(unsigned char *buf, struct status_t *to) {
+void decodeBinStatus2(unsigned char *buf, struct status_t *to) {
 	if (!shuntPause) {
 		to->iShunt = bufToShortLE(buf + 3);
 	}
@@ -397,6 +402,23 @@ void decodeBinStatus(unsigned char *buf, struct status_t *to) {
 	to->hasRx = buf[16];
 	to->softwareAddressing = buf[17];
 	to->automatic = buf[18];
+}
+
+void decodeBinStatus3(unsigned char *buf, struct status_t *to) {
+	if (!shuntPause) {
+		to->iShunt = bufToShortLE(buf + 3);
+	}
+	if (!isCellShunting(to)) {
+		to->vCell = bufToShortLE(buf + 5);
+	}
+	to->vShunt = bufToShortLE(buf + 7);
+	to->temperature = bufToShortLE(buf + 9);
+	to->minCurrent = bufToShortLE(buf + 11);
+	to->gainPot = buf[13];
+	to->vShuntPot = buf[14];
+	to->hasRx = buf[15];
+	to->softwareAddressing = buf[16];
+	to->automatic = buf[17];
 }
 
 void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
@@ -459,6 +481,9 @@ unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery
 }
 
 unsigned char setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
+	if (cell->version == (char) -1) {
+		return FALSE;
+	}
 	if (cell->minCurrent == minCurrent && cell->targetShuntCurrent == minCurrent) {
 		return FALSE;
 	}
@@ -587,7 +612,7 @@ char isCellShunting(struct status_t *cell) {
 	return 0;
 }
 
-void sendCommand(struct status_t *cell, char sequence, unsigned char command) {
+void sendCommand2(struct status_t *cell, char sequence, unsigned char command) {
 	// we're sending "SXXSZCC"
 	crc_t crc = crc_init();
 	crc = writeCrc(START_OF_PACKET, crc);
@@ -598,6 +623,29 @@ void sendCommand(struct status_t *cell, char sequence, unsigned char command) {
 	crc = crc_finalize(crc);
 	writeWithEscape(crc & 0x00FF);
 	writeWithEscape((crc & 0xFF00) >> 8);
+}
+
+void sendCommand3(struct status_t *cell, unsigned char command) {
+	// we're sending "SXXZCC"
+	crc_t crc = crc_init();
+	crc = writeCrc(START_OF_PACKET, crc);
+	crc = writeWithEscapeCrc(cell->cellId & 0x00FF, crc);
+	crc = writeWithEscapeCrc((cell->cellId & 0xFF00) >> 8, crc);
+	crc = writeWithEscapeCrc(command, crc);
+	crc = crc_finalize(crc);
+	writeWithEscape(crc & 0x00FF);
+	writeWithEscape((crc & 0xFF00) >> 8);
+}
+
+void sendCommand(struct status_t *cell, char sequence, unsigned char command) {
+	if (cell->version == 2) {
+		sendCommand2(cell, sequence, command);
+	} else if (cell->version == 3) {
+		sendCommand3(cell, command);
+	} else {
+		printf("unknown version %d\n", cell->version);
+		exit(1);
+	}
 }
 
 crc_t writeCrc(unsigned char c, crc_t crc) {
@@ -741,7 +789,8 @@ double asDouble(int s) {
 	return ((double) s) / 1000;
 }
 
-unsigned char _getCellVersion(struct status_t *cell) {
+unsigned char _getCellVersion2(struct status_t *cell) {
+	cell->version = 2;
 	sendCommand(cell, 0, '?');
 	unsigned char buf[13];
 	struct timeval end;
@@ -760,13 +809,39 @@ unsigned char _getCellVersion(struct status_t *cell) {
 	return 1;
 }
 
+unsigned char _getCellVersion3(struct status_t *cell) {
+	cell->version = 3;
+	sendCommand(cell, 0, '?');
+	unsigned char buf[16];
+	struct timeval end;
+	if (!readPacket(cell, buf, 16, &end)) {
+		return FALSE;
+	}
+	short cellId = bufToShortLE(buf + 1);
+	if (cell->cellId != cellId) {
+		fprintf(stderr, "sent getVersion to %4d, got reply from %4d\n", cell->cellId, cellId);
+		return 0;
+	}
+	cell->version = buf[3];
+	cell->isKelvinConnection = buf[4];
+	cell->isResistorShunt = buf[5];
+	cell->isHardSwitchedShunt = buf[6];
+	cell->revision = bufToShortLE(buf + 7);
+	cell->isClean = buf[9];
+	cell->whenProgrammed = bufToLongLE(buf + 10);
+	return 1;
+}
+
 /**
  * Obtain version information about the specified cell and store it in the passed cell structure
  * @return true if version information was successfully obtained
  */
 unsigned char getCellVersion(struct status_t *cell) {
 	for (int i = 0; i < 3; i++) {
-		if (_getCellVersion(cell)) {
+		if (_getCellVersion2(cell)) {
+			return TRUE;
+		}
+		if (_getCellVersion3(cell)) {
 			return TRUE;
 		}
 	}
@@ -784,7 +859,11 @@ void getSlaveVersions() {
 			struct status_t *cell = battery->cells + j;
 			printf("Checking cell %3d (id %4d) ...", j, cell->cellId);
 			getCellVersion(cell);
-			printf("... protocol version %2hhd r%d %s whenProgrammed %ld\n", cell->version, cell->revision,
+			char *resistorShunt = cell->isResistorShunt ? "resistorShunt" : "transistorShunt";
+			char *kelvinConnection = cell->isKelvinConnection ? "kelvin" : "noKelvin";
+			char *hardSwitchedShunt = cell->isHardSwitchedShunt ? "hardSwitched" : "adjustable";
+			printf("... protocol version %2hhd %s %s %s r%d %s whenProgrammed %ld\n", cell->version,
+					kelvinConnection, resistorShunt, hardSwitchedShunt, cell->revision,
 					cell->isClean ? "clean" : "modified", cell->whenProgrammed);
 		}
 	}
