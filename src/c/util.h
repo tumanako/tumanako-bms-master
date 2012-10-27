@@ -22,10 +22,10 @@
 
 #include "linux/types.h"
 
-extern double milliToDouble(short s);
-extern double centiToDouble(short s);
+extern double milliToDouble(unsigned short s);
+extern double centiToDouble(unsigned short s);
 void charToBuf(unsigned char c, __u8* buf);
-void shortToBuf(short s, __u8* buf);
+void shortToBuf(unsigned short s, __u8* buf);
 unsigned char bufToChar(__u8 *c);
 unsigned short bufToShort(__u8 *c);
 unsigned short bufToShortLE(__u8 *c);

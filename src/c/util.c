@@ -20,12 +20,12 @@
 #include "util.h"
 
 /* return a double representation of the passed value divided by 1000. */
-double milliToDouble(short s) {
+double milliToDouble(unsigned short s) {
 	return ((double) s) / 1000;
 }
 
 /* return a double representation of the passed value divided by 100. */
-double centiToDouble(short s) {
+double centiToDouble(unsigned short s) {
 	return ((double) s) / 100;
 }
 
@@ -35,7 +35,7 @@ void charToBuf(const unsigned char c, __u8* buf) {
 }
 
 /** Copy the passed short into the passed buffer. */
-void shortToBuf(short s, __u8* buf) {
+void shortToBuf(unsigned short s, __u8* buf) {
 	buf[0] = (__u8) (s >> 8);
 	buf[1] = (__u8) (s & 0x00ff);
 }

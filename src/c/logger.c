@@ -46,10 +46,10 @@
 struct logger_status_t {
 	int index;
 	char valued;
-	short voltage;
-	short shuntCurrent;
-	short minCurrent;
-	short temperature;
+	unsigned short voltage;
+	unsigned short shuntCurrent;
+	unsigned short minCurrent;
+	unsigned short temperature;
 };
 
 struct threadArguments_t {
