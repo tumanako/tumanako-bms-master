@@ -64,7 +64,7 @@
 #define EVD5_BINSTATUS_2_LENGTH 21
 
 void initData(struct config_t *config);
-void sendCommand(unsigned short address, char sequence, unsigned char command);
+void sendCommand(struct status_t *cell, char sequence, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
@@ -165,7 +165,8 @@ int main() {
 	for (unsigned char i = 0; i < data.batteryCount; i++) {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
-			sendCommand(battery->cells[j].cellId, seq++, 'r');
+			struct status_t *cell = battery->cells + j;
+			sendCommand(cell, seq++, 'r');
 		}
 	}
 
@@ -314,7 +315,7 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 		sentSequenceNumber = sequenceNumber++;
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
-		sendCommand(status->cellId, sentSequenceNumber, '/');
+		sendCommand(status, sentSequenceNumber, '/');
 		if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
 			continue;
 		}
@@ -472,7 +473,7 @@ unsigned char setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 			exit(1);
 		}
 		char cmd = 0x30 + minCurrent / 50;
-		sendCommand(cell->cellId, sequenceNumber, cmd);
+		sendCommand(cell, sequenceNumber, cmd);
 		getCellState(cell);
 	}
 	// couldn't get to desired current after 20 attempts???
@@ -586,12 +587,12 @@ char isCellShunting(struct status_t *cell) {
 	return 0;
 }
 
-void sendCommand(unsigned short address, char sequence, unsigned char command) {
+void sendCommand(struct status_t *cell, char sequence, unsigned char command) {
 	// we're sending "SXXSZCC"
 	crc_t crc = crc_init();
 	crc = writeCrc(START_OF_PACKET, crc);
-	crc = writeWithEscapeCrc(address & 0x00FF, crc);
-	crc = writeWithEscapeCrc((address & 0xFF00) >> 8, crc);
+	crc = writeWithEscapeCrc(cell->cellId & 0x00FF, crc);
+	crc = writeWithEscapeCrc((cell->cellId & 0xFF00) >> 8, crc);
 	crc = writeWithEscapeCrc(sequence, crc);
 	crc = writeWithEscapeCrc(command, crc);
 	crc = crc_finalize(crc);
@@ -741,7 +742,7 @@ double asDouble(int s) {
 }
 
 unsigned char _getCellVersion(struct status_t *cell) {
-	sendCommand(cell->cellId, 0, '?');
+	sendCommand(cell, 0, '?');
 	unsigned char buf[13];
 	struct timeval end;
 	if (!readPacket(cell, buf, 13, &end)) {
