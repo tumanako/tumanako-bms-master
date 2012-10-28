@@ -892,7 +892,7 @@ unsigned char _getCellVersion3(struct status_t *cell) {
 	sendCommand(cell, 0, '?');
 	unsigned char buf[16];
 	struct timeval end;
-	if (!readPacket(cell, buf, 16, &end)) {
+	if (!readPacket(cell, buf, 17, &end)) {
 		return FALSE;
 	}
 	short cellId = bufToShortLE(buf + 1);
@@ -904,9 +904,10 @@ unsigned char _getCellVersion3(struct status_t *cell) {
 	cell->isKelvinConnection = buf[4];
 	cell->isResistorShunt = buf[5];
 	cell->isHardSwitchedShunt = buf[6];
-	cell->revision = bufToShortLE(buf + 7);
-	cell->isClean = buf[9];
-	cell->whenProgrammed = bufToLongLE(buf + 10);
+	cell->hasTemperatureSensor = buf[7];
+	cell->revision = bufToShortLE(buf + 8);
+	cell->isClean = buf[10];
+	cell->whenProgrammed = bufToLongLE(buf + 11);
 	return 1;
 }
 

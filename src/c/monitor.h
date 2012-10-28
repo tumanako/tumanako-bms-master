@@ -44,9 +44,10 @@ struct status_t {
 	// microseconds required to acquire last reading
 	unsigned long latency;
 	char version;
-	unsigned short isKelvinConnection;
-	unsigned short isResistorShunt;
-	unsigned short isHardSwitchedShunt;
+	unsigned char isKelvinConnection;
+	unsigned char isResistorShunt;
+	unsigned char isHardSwitchedShunt;
+	unsigned char hasTemperatureSensor;
 	unsigned short revision;
 	unsigned char isClean;
 	unsigned long whenProgrammed;
