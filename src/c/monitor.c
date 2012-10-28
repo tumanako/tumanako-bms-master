@@ -62,6 +62,7 @@
 #define ESCAPE_CHARACTER 0xff
 #define START_OF_PACKET 0xfe
 #define EVD5_BINSTATUS_2_LENGTH 21
+#define EVD5_SUMMARY_LENGTH 13
 
 void initData(struct config_t *config);
 void sendCommand(struct status_t *cell, char sequence, unsigned char command);
@@ -105,6 +106,83 @@ int fd;
 struct monitor_t data;
 
 char chargerState = 0;
+
+void decodeSummary(unsigned char *buf, struct status_t *to) {
+	if (!shuntPause) {
+		to->iShunt = bufToShortLE(buf + 3);
+	}
+	if (!isCellShunting(to)) {
+		to->vCell = bufToShortLE(buf + 5);
+	}
+	to->vShunt = bufToShortLE(buf + 7);
+	to->temperature = bufToShortLE(buf + 9);
+}
+
+char _getCellSummary(struct status_t *status, int maxAttempts) {
+	for (int attempt = 0; TRUE; attempt++) {
+		if (attempt >= maxAttempts) {
+			return 0;
+			fprintf(stderr, "%d bus errors, exiting\n", attempt);
+			chargercontrol_shutdown();
+			exit(1);
+		}
+		if (attempt > 0) {
+			fprintf(stderr, "no response from %d (id %d) in %s, resetting\n", status->cellIndex, status->cellId,
+					status->battery->name);
+			buscontrol_setBus(FALSE);
+			buscontrol_setBus(TRUE);
+		}
+		unsigned char buf[EVD5_BINSTATUS_2_LENGTH];
+		struct timeval start, end;
+		gettimeofday(&start, NULL);
+		if (status->version == 2) {
+			sendCommand(status, 0, '/');
+			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
+				continue;
+			}
+		} else {
+			sendCommand(status, 0, 's');
+			if (!readPacket(status, buf, EVD5_SUMMARY_LENGTH, &end)) {
+				continue;
+			}
+		}
+		unsigned short recievedCellId =	bufToShortLE(buf + 1);
+		if (status->cellId != recievedCellId) {
+			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n", status->cellIndex,
+					status->cellId, status->battery->name, recievedCellId);
+			dumpBuffer(buf, EVD5_BINSTATUS_2_LENGTH);
+			flushInputBuffer();
+			continue;
+		}
+		if (status->version == 2) {
+			decodeBinStatus2(buf, status);
+		} else {
+			decodeSummary(buf, status);
+		}
+		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+		break;
+	}
+	return 1;
+}
+
+char getCellSummary(struct status_t *cell) {
+	// if we didn't get the cell version at startup, try again
+	if (cell->version == (char) -1) {
+		if (!getCellVersion(cell)) {
+			return FALSE;
+		}
+	}
+	char success = _getCellSummary(cell, 2);
+	if (!success) {
+		cell->errorCount++;
+		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
+				cell->battery->name);
+		chargercontrol_shutdown();
+		return FALSE;
+	}
+	return TRUE;
+}
+
 int main() {
 	struct termios oldtio, newtio;
 
@@ -261,7 +339,7 @@ void getCellStates() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
-			char success = getCellState(cell);
+			char success = getCellSummary(cell);
 			cell->isDataCurrent = success;
 			printCellDetail(cell);
 			if (!success) {
