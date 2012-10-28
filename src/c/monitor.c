@@ -62,7 +62,8 @@
 #define ESCAPE_CHARACTER 0xff
 #define START_OF_PACKET 0xfe
 #define EVD5_BINSTATUS_LENGTH 20
-#define EVD5_SUMMARY_LENGTH 13
+#define EVD5_SUMMARY_3_LENGTH 13
+#define EVD5_SUMMARY_4_LENGTH 11
 
 void initData(struct config_t *config);
 void sendCommand(struct status_t *cell, unsigned char command);
@@ -106,7 +107,7 @@ struct monitor_t data;
 
 char chargerState = 0;
 
-void decodeSummary(unsigned char *buf, struct status_t *to) {
+void decodeSummary3(unsigned char *buf, struct status_t *to) {
 	if (!shuntPause) {
 		to->iShunt = bufToShortLE(buf + 3);
 	}
@@ -115,6 +116,16 @@ void decodeSummary(unsigned char *buf, struct status_t *to) {
 	}
 	to->vShunt = bufToShortLE(buf + 7);
 	to->temperature = bufToShortLE(buf + 9);
+}
+
+void decodeSummary4(unsigned char *buf, struct status_t *to) {
+	if (!shuntPause) {
+		to->iShunt = bufToShortLE(buf + 3);
+	}
+	if (!isCellShunting(to)) {
+		to->vCell = bufToShortLE(buf + 5);
+	}
+	to->temperature = bufToShortLE(buf + 7);
 }
 
 char _getCellSummary(struct status_t *status, int maxAttempts) {
@@ -131,22 +142,32 @@ char _getCellSummary(struct status_t *status, int maxAttempts) {
 			buscontrol_setBus(FALSE);
 			buscontrol_setBus(TRUE);
 		}
-		unsigned char buf[EVD5_SUMMARY_LENGTH];
+		unsigned char buf[EVD5_SUMMARY_3_LENGTH];
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
 		sendCommand(status, 's');
-		if (!readPacket(status, buf, EVD5_SUMMARY_LENGTH, &end)) {
-			continue;
+		if (status->version == 3) {
+			if (!readPacket(status, buf, EVD5_SUMMARY_3_LENGTH, &end)) {
+				continue;
+			}
+		} else if (status->version == 4) {
+			if (!readPacket(status, buf, EVD5_SUMMARY_4_LENGTH, &end)) {
+				continue;
+			}
 		}
 		unsigned short recievedCellId =	bufToShortLE(buf + 1);
 		if (status->cellId != recievedCellId) {
 			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n", status->cellIndex,
 					status->cellId, status->battery->name, recievedCellId);
-			dumpBuffer(buf, EVD5_SUMMARY_LENGTH);
+			dumpBuffer(buf, EVD5_SUMMARY_3_LENGTH);
 			flushInputBuffer();
 			continue;
 		}
-		decodeSummary(buf, status);
+		if (status->version == 3) {
+				decodeSummary3(buf, status);
+		} else if (status->version == 4) {
+			decodeSummary4(buf, status);
+		}
 		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 		break;
 	}
