@@ -61,7 +61,7 @@
 
 #define ESCAPE_CHARACTER 0xff
 #define START_OF_PACKET 0xfe
-#define EVD5_BINSTATUS_2_LENGTH 21
+#define EVD5_BINSTATUS_LENGTH 20
 #define EVD5_SUMMARY_LENGTH 13
 
 void initData(struct config_t *config);
@@ -69,8 +69,7 @@ void sendCommand(struct status_t *cell, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
-void decodeBinStatus2(unsigned char *buf, struct status_t *to);
-void decodeBinStatus3(unsigned char *buf, struct status_t *to);
+void decodeBinStatus(unsigned char *buf, struct status_t *to);
 void writeSlowly(int fd, unsigned char *s, int length);
 crc_t writeCrc(unsigned char c, crc_t crc);
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc);
@@ -132,33 +131,22 @@ char _getCellSummary(struct status_t *status, int maxAttempts) {
 			buscontrol_setBus(FALSE);
 			buscontrol_setBus(TRUE);
 		}
-		unsigned char buf[EVD5_BINSTATUS_2_LENGTH];
+		unsigned char buf[EVD5_SUMMARY_LENGTH];
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
-		if (status->version == 2) {
-			sendCommand(status, '/');
-			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
-				continue;
-			}
-		} else {
-			sendCommand(status, 's');
-			if (!readPacket(status, buf, EVD5_SUMMARY_LENGTH, &end)) {
-				continue;
-			}
+		sendCommand(status, 's');
+		if (!readPacket(status, buf, EVD5_SUMMARY_LENGTH, &end)) {
+			continue;
 		}
 		unsigned short recievedCellId =	bufToShortLE(buf + 1);
 		if (status->cellId != recievedCellId) {
 			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n", status->cellIndex,
 					status->cellId, status->battery->name, recievedCellId);
-			dumpBuffer(buf, EVD5_BINSTATUS_2_LENGTH);
+			dumpBuffer(buf, EVD5_SUMMARY_LENGTH);
 			flushInputBuffer();
 			continue;
 		}
-		if (status->version == 2) {
-			decodeBinStatus2(buf, status);
-		} else {
-			decodeSummary(buf, status);
-		}
+		decodeSummary(buf, status);
 		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 		break;
 	}
@@ -243,9 +231,6 @@ int main() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
-			cell->version = 2;
-			sendCommand(cell, 'r');
-			cell->version = 3;
 			sendCommand(cell, 'r');
 		}
 	}
@@ -388,32 +373,22 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 			buscontrol_setBus(FALSE);
 			buscontrol_setBus(TRUE);
 		}
-		unsigned char buf[EVD5_BINSTATUS_2_LENGTH];
+		unsigned char buf[EVD5_BINSTATUS_LENGTH];
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
 		sendCommand(status, '/');
-		if (status->version == 2) {
-			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
-				continue;
-			}
-		} else {
-			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH - 1, &end)) {
-				continue;
-			}
+		if (!readPacket(status, buf, EVD5_BINSTATUS_LENGTH, &end)) {
+			continue;
 		}
 		unsigned short recievedCellId =	bufToShortLE(buf + 1);
 		if (status->cellId != recievedCellId) {
 			fprintf(stderr, "\nSent message to %2d (id %2d) in %s but received response from 0x%x\n", status->cellIndex,
 					status->cellId, status->battery->name, recievedCellId);
-			dumpBuffer(buf, EVD5_BINSTATUS_2_LENGTH);
+			dumpBuffer(buf, EVD5_BINSTATUS_LENGTH);
 			flushInputBuffer();
 			continue;
 		}
-		if (status->version == 2) {
-			decodeBinStatus2(buf, status);
-		} else {
-			decodeBinStatus3(buf, status);
-		}
+		decodeBinStatus(buf, status);
 		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 		break;
 	}
@@ -458,25 +433,7 @@ unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned cha
 	return actualLength;
 }
 
-void decodeBinStatus2(unsigned char *buf, struct status_t *to) {
-	if (!shuntPause) {
-		to->iShunt = bufToShortLE(buf + 3);
-	}
-	if (!isCellShunting(to)) {
-		to->vCell = bufToShortLE(buf + 5);
-	}
-	to->vShunt = bufToShortLE(buf + 7);
-	to->temperature = bufToShortLE(buf + 9);
-	to->minCurrent = bufToShortLE(buf + 11);
-	to->sequenceNumber = buf[13];
-	to->gainPot = buf[14];
-	to->vShuntPot = buf[15];
-	to->hasRx = buf[16];
-	to->softwareAddressing = buf[17];
-	to->automatic = buf[18];
-}
-
-void decodeBinStatus3(unsigned char *buf, struct status_t *to) {
+void decodeBinStatus(unsigned char *buf, struct status_t *to) {
 	if (!shuntPause) {
 		to->iShunt = bufToShortLE(buf + 3);
 	}
@@ -684,20 +641,7 @@ char isCellShunting(struct status_t *cell) {
 	return 0;
 }
 
-void sendCommand2(struct status_t *cell, unsigned char command) {
-	// we're sending "SXXSZCC"
-	crc_t crc = crc_init();
-	crc = writeCrc(START_OF_PACKET, crc);
-	crc = writeWithEscapeCrc(cell->cellId & 0x00FF, crc);
-	crc = writeWithEscapeCrc((cell->cellId & 0xFF00) >> 8, crc);
-	crc = writeWithEscapeCrc(0, crc);
-	crc = writeWithEscapeCrc(command, crc);
-	crc = crc_finalize(crc);
-	writeWithEscape(crc & 0x00FF);
-	writeWithEscape((crc & 0xFF00) >> 8);
-}
-
-void sendCommand3(struct status_t *cell, unsigned char command) {
+void sendCommand(struct status_t *cell, unsigned char command) {
 	// we're sending "SXXZCC"
 	crc_t crc = crc_init();
 	crc = writeCrc(START_OF_PACKET, crc);
@@ -707,17 +651,6 @@ void sendCommand3(struct status_t *cell, unsigned char command) {
 	crc = crc_finalize(crc);
 	writeWithEscape(crc & 0x00FF);
 	writeWithEscape((crc & 0xFF00) >> 8);
-}
-
-void sendCommand(struct status_t *cell, unsigned char command) {
-	if (cell->version == 2) {
-		sendCommand2(cell, command);
-	} else if (cell->version == 3) {
-		sendCommand3(cell, command);
-	} else {
-		printf("unknown version %d\n", cell->version);
-		exit(1);
-	}
 }
 
 crc_t writeCrc(unsigned char c, crc_t crc) {
@@ -861,27 +794,7 @@ double asDouble(int s) {
 	return ((double) s) / 1000;
 }
 
-unsigned char _getCellVersion2(struct status_t *cell) {
-	cell->version = 2;
-	sendCommand(cell, '?');
-	unsigned char buf[13];
-	struct timeval end;
-	if (!readPacket(cell, buf, 13, &end)) {
-		return FALSE;
-	}
-	short cellId = bufToShortLE(buf + 1);
-	if (cell->cellId != cellId) {
-		fprintf(stderr, "sent getVersion to %4d, got reply from %4d\n", cell->cellId, cellId);
-		return 0;
-	}
-	cell->version = buf[3];
-	cell->revision = bufToShortLE(buf + 4);
-	cell->isClean = buf[6];
-	cell->whenProgrammed = bufToLongLE(buf + 7);
-	return 1;
-}
-
-unsigned char _getCellVersion3(struct status_t *cell) {
+unsigned char _getCellVersion(struct status_t *cell) {
 	cell->version = 3;
 	sendCommand(cell, '?');
 	unsigned char buf[16];
@@ -911,10 +824,7 @@ unsigned char _getCellVersion3(struct status_t *cell) {
  */
 unsigned char getCellVersion(struct status_t *cell) {
 	for (int i = 0; i < 3; i++) {
-		if (_getCellVersion2(cell)) {
-			return TRUE;
-		}
-		if (_getCellVersion3(cell)) {
+		if (_getCellVersion(cell)) {
 			return TRUE;
 		}
 	}
