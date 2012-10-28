@@ -65,7 +65,7 @@
 #define EVD5_SUMMARY_LENGTH 13
 
 void initData(struct config_t *config);
-void sendCommand(struct status_t *cell, char sequence, unsigned char command);
+void sendCommand(struct status_t *cell, unsigned char command);
 void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
@@ -136,12 +136,12 @@ char _getCellSummary(struct status_t *status, int maxAttempts) {
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
 		if (status->version == 2) {
-			sendCommand(status, 0, '/');
+			sendCommand(status, '/');
 			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
 				continue;
 			}
 		} else {
-			sendCommand(status, 0, 's');
+			sendCommand(status, 's');
 			if (!readPacket(status, buf, EVD5_SUMMARY_LENGTH, &end)) {
 				continue;
 			}
@@ -236,8 +236,6 @@ int main() {
 	tcflush(fd, TCIFLUSH);
 	tcsetattr(fd, TCSANOW, &newtio);
 
-	char seq = '0';
-
 	// send a byte to wake up the slaves
 	writeWithEscape('a');
 
@@ -246,9 +244,9 @@ int main() {
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
 			cell->version = 2;
-			sendCommand(cell, seq++, 'r');
+			sendCommand(cell, 'r');
 			cell->version = 3;
-			sendCommand(cell, seq++, 'r');
+			sendCommand(cell, 'r');
 		}
 	}
 
@@ -358,8 +356,6 @@ void getCellStates() {
 	}
 }
 
-unsigned char sequenceNumber = 0;
-
 char getCellState(struct status_t *cell) {
 	// if we didn't get the cell version at startup, try again
 	if (cell->version == (char) -1) {
@@ -393,11 +389,9 @@ char _getCellState(struct status_t *status, int maxAttempts) {
 			buscontrol_setBus(TRUE);
 		}
 		unsigned char buf[EVD5_BINSTATUS_2_LENGTH];
-		unsigned char sentSequenceNumber;
-		sentSequenceNumber = sequenceNumber++;
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
-		sendCommand(status, sentSequenceNumber, '/');
+		sendCommand(status, '/');
 		if (status->version == 2) {
 			if (!readPacket(status, buf, EVD5_BINSTATUS_2_LENGTH, &end)) {
 				continue;
@@ -576,7 +570,7 @@ unsigned char setMinCurrent(struct status_t *cell, unsigned short minCurrent) {
 			exit(1);
 		}
 		char cmd = 0x30 + minCurrent / 50;
-		sendCommand(cell, sequenceNumber, cmd);
+		sendCommand(cell, cmd);
 		getCellState(cell);
 	}
 	// couldn't get to desired current after 20 attempts???
@@ -690,13 +684,13 @@ char isCellShunting(struct status_t *cell) {
 	return 0;
 }
 
-void sendCommand2(struct status_t *cell, char sequence, unsigned char command) {
+void sendCommand2(struct status_t *cell, unsigned char command) {
 	// we're sending "SXXSZCC"
 	crc_t crc = crc_init();
 	crc = writeCrc(START_OF_PACKET, crc);
 	crc = writeWithEscapeCrc(cell->cellId & 0x00FF, crc);
 	crc = writeWithEscapeCrc((cell->cellId & 0xFF00) >> 8, crc);
-	crc = writeWithEscapeCrc(sequence, crc);
+	crc = writeWithEscapeCrc(0, crc);
 	crc = writeWithEscapeCrc(command, crc);
 	crc = crc_finalize(crc);
 	writeWithEscape(crc & 0x00FF);
@@ -715,9 +709,9 @@ void sendCommand3(struct status_t *cell, unsigned char command) {
 	writeWithEscape((crc & 0xFF00) >> 8);
 }
 
-void sendCommand(struct status_t *cell, char sequence, unsigned char command) {
+void sendCommand(struct status_t *cell, unsigned char command) {
 	if (cell->version == 2) {
-		sendCommand2(cell, sequence, command);
+		sendCommand2(cell, command);
 	} else if (cell->version == 3) {
 		sendCommand3(cell, command);
 	} else {
@@ -869,7 +863,7 @@ double asDouble(int s) {
 
 unsigned char _getCellVersion2(struct status_t *cell) {
 	cell->version = 2;
-	sendCommand(cell, 0, '?');
+	sendCommand(cell, '?');
 	unsigned char buf[13];
 	struct timeval end;
 	if (!readPacket(cell, buf, 13, &end)) {
@@ -889,7 +883,7 @@ unsigned char _getCellVersion2(struct status_t *cell) {
 
 unsigned char _getCellVersion3(struct status_t *cell) {
 	cell->version = 3;
-	sendCommand(cell, 0, '?');
+	sendCommand(cell, '?');
 	unsigned char buf[16];
 	struct timeval end;
 	if (!readPacket(cell, buf, 17, &end)) {
