@@ -779,11 +779,17 @@ void printCellDetail(struct status_t *status) {
 	} else {
 		write(1, "\E[m", 3);
 	}
-	char isClean = !status->isClean ? '*' : ' ';
+	char isClean = status->isClean ? ' ' : '*';
 	if (status->isDataCurrent) {
-		printf("%02d %4d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f t=%5.1f s=%02d g=%02d %2ld %4hd%c %5d ", status->cellIndex,
+		printf("%02d %4d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f ", status->cellIndex,
 				status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
-				asDouble(status->minCurrent), asDouble(status->temperature) * 10, status->vShuntPot, status->gainPot,
+				asDouble(status->minCurrent));
+		if (status->hasTemperatureSensor) {
+			printf("t=%5.1f  ", asDouble(status->temperature) * 10);
+		} else {
+			printf("t=%5.1f* ", asDouble(status->temperature) * 10);
+		}
+		printf("s=%02d g=%02d %2ld %4hd%c %5d ", status->vShuntPot, status->gainPot,
 				status->latency / 1000, status->revision, isClean, status->errorCount);
 		unsigned char tens;
 		unsigned char hundreds;
