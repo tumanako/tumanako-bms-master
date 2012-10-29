@@ -56,17 +56,27 @@ int console_init(struct config_t *config) {
 void moveCursor(unsigned char x, unsigned char y) {
 	char buf[20];
 	sprintf(buf, "\E[%d;%df", y, x);
-	write(2, buf, strlen(buf));
+	write(1, buf, strlen(buf));
 }
 
-void moveToCell(unsigned char batteryIndex, unsigned short cellIndex, unsigned char offset) {
+void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned short cellIndex, unsigned char offset) {
 	unsigned char x;
 	if (cellIndex % 2) {
 		x = 45;
 	} else {
 		x = 1;
 	}
-	moveCursor(x + offset, cellIndex / 2 + 1);
+	unsigned char batteryOffset = 1;
+	for (int i = 0; i < batteryIndex; i++) {
+		unsigned short cellCount = config->batteries[i].cellCount;
+		unsigned char lines = cellCount / 2;
+		fprintf(stderr, "cells %d lines %d\n", cellCount, lines);
+		if (cellCount % 2) {
+			lines++;
+		}
+		batteryOffset += lines;
+	}
+	moveCursor(x + offset, batteryOffset + cellIndex / 2);
 }
 
 /* Decode a voltage frame. */
@@ -80,11 +90,11 @@ void console_decode3f0(struct can_frame *frame, struct config_t *config) {
 	if (cellIndex > battery->cellCount) {
 		return;
 	}
-	moveToCell(batteryIndex, cellIndex, 0);
+	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
 	unsigned short voltage = bufToShort(frame->data + 3);
-	moveToCell(batteryIndex, cellIndex, 4);
+	moveToCell(config, batteryIndex, cellIndex, 4);
 	fprintf(stdout, "Vc=%.3f ", milliToDouble(voltage));
 	fflush(stdout);
 }
@@ -100,11 +110,11 @@ void console_decode3f1(struct can_frame *frame, struct config_t *config) {
 	if (cellIndex > battery->cellCount) {
 		return;
 	}
-	moveToCell(batteryIndex, cellIndex, 0);
+	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
 	unsigned short shuntCurrent = bufToShort(frame->data + 3);
-	moveToCell(batteryIndex, cellIndex, 13);
+	moveToCell(config, batteryIndex, cellIndex, 13);
 	printf("Is=%.3f ", milliToDouble(shuntCurrent));
 	fflush(stdout);
 }
@@ -120,11 +130,11 @@ void console_decode3f2(struct can_frame *frame, struct config_t *config) {
 	if (cellIndex > battery->cellCount) {
 		return;
 	}
-	moveToCell(batteryIndex, cellIndex, 0);
+	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
 	unsigned short minCurrent = bufToShort(frame->data + 3);
-	moveToCell(batteryIndex, cellIndex, 22);
+	moveToCell(config, batteryIndex, cellIndex, 22);
 	fprintf(stdout, "It=%.3f ", milliToDouble(minCurrent));
 	fflush(stdout);
 }
@@ -140,11 +150,11 @@ void console_decode3f3(struct can_frame *frame, struct config_t *config) {
 	if (cellIndex > battery->cellCount) {
 		return;
 	}
-	moveToCell(batteryIndex, cellIndex, 0);
+	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
 	unsigned char temperature = bufToShort(frame->data + 3);
-	moveToCell(batteryIndex, cellIndex, 31);
+	moveToCell(config, batteryIndex, cellIndex, 31);
 	fprintf(stdout, "t=%4.1f ", milliToDouble(temperature) * 100);
 	fflush(stdout);
 }
