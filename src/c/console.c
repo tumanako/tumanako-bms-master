@@ -46,11 +46,21 @@
 extern int readFrame(int s, struct can_frame *frame);
 void *console_backgroundThread(void *ptr);
 
+static unsigned short maxVoltage = 0;
+static unsigned short maxVoltageCell;
+static unsigned short minVoltage = 0xffff;
+static unsigned short minVoltageCell;
+static unsigned long totalVoltage = 0;
+
 int console_init(struct config_t *config) {
 	pthread_t consoleThread;
 	pthread_create(&consoleThread, NULL, console_backgroundThread, (void *) config);
 
 	return 0;
+}
+
+static double asDouble(int s) {
+	return ((double) s) / 1000;
 }
 
 void moveCursor(unsigned char x, unsigned char y) {
@@ -73,7 +83,7 @@ void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned sh
 		if (cellCount % 2) {
 			lines++;
 		}
-		batteryOffset += lines;
+		batteryOffset += lines + 1;
 	}
 	moveCursor(x + offset, batteryOffset + cellIndex / 2);
 }
@@ -96,6 +106,26 @@ void console_decode3f0(struct can_frame *frame, struct config_t *config) {
 	moveToCell(config, batteryIndex, cellIndex, 4);
 	fprintf(stdout, "Vc=%.3f ", milliToDouble(voltage));
 	fflush(stdout);
+	if (voltage > maxVoltage) {
+		maxVoltage = voltage;
+		maxVoltageCell = cellIndex;
+	}
+	if (voltage < minVoltage) {
+		minVoltage = voltage;
+		minVoltageCell = cellIndex;
+	}
+	totalVoltage += voltage;
+	if (cellIndex == config->batteries[batteryIndex].cellCount - 1) {
+		moveToCell(config, batteryIndex, battery->cellCount, 0);
+		printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh", battery->name,
+				asDouble(minVoltage), minVoltageCell, asDouble(totalVoltage / battery->cellCount),
+				asDouble(maxVoltage), maxVoltageCell, asDouble(totalVoltage),
+				soc_getVoltage(), soc_getCurrent(), soc_getAh());
+		fflush(stdout);
+		minVoltage = 0xffff;
+		maxVoltage = 0;
+		totalVoltage = 0;
+	}
 }
 
 /* Decode a shunt current frame. */

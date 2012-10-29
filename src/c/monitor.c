@@ -318,7 +318,9 @@ int main() {
 			chargercontrol_shutdown();
 			shutdown = 1;
 		}
+#ifdef CONSOLE
 		printSummary();
+#endif
 		shuntPause = FALSE;
 		unsigned char shuntValueChanged = FALSE;
 		for (unsigned char i = 0; i < data.batteryCount; i++) {
