@@ -70,7 +70,6 @@ void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned sh
 	for (int i = 0; i < batteryIndex; i++) {
 		unsigned short cellCount = config->batteries[i].cellCount;
 		unsigned char lines = cellCount / 2;
-		fprintf(stderr, "cells %d lines %d\n", cellCount, lines);
 		if (cellCount % 2) {
 			lines++;
 		}
