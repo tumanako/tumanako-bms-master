@@ -42,12 +42,14 @@
 #include "soc.h"
 #include "monitor_can.h"
 #include "logger.h"
+#include "console.h"
 #include "util.h"
 
 #define BAUDRATE B9600
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
+//#define CONSOLE
 
 #define CELL_ID_FILE "cells.txt"
 #define DEBUG 0
@@ -222,6 +224,12 @@ int main() {
 		return 1;
 	}
 
+#ifdef CONSOLE
+	if (console_init(config)) {
+		return 1;
+	}
+#endif
+
 	buscontrol_setBus(TRUE);
 	fd = open(config->serialPort, O_RDWR | O_NOCTTY);
 	if (fd < 0) {
@@ -345,7 +353,9 @@ void getCellStates() {
 			struct status_t *cell = battery->cells + j;
 			char success = getCellSummary(cell);
 			cell->isDataCurrent = success;
+#ifndef CONSOLE
 			printCellDetail(cell);
+#endif
 			if (!success) {
 				continue;
 			}

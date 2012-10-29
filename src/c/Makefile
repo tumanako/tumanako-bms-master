@@ -10,7 +10,7 @@ CHARGER_CONTROL_SRC=chargercontrol_none.c
 CHARGER_CONTROL_CFLAGS=
 CHARGER_CONTROL_LDFLAGS=
 CHARGER_CONTROL_LIBS=
-MONITOR_SRC=monitor.c crc.c soc_evision.c monitor_can.c logger.c util.c config.c $(CHARGER_CONTROL_SRC)
+MONITOR_SRC=monitor.c crc.c soc_evision.c monitor_can.c logger.c util.c config.c console.c $(CHARGER_CONTROL_SRC)
 MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 
 SRCS=$(wildcard *.c)
