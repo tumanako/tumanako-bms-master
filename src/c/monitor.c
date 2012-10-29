@@ -784,17 +784,15 @@ void printCellDetail(struct status_t *status) {
 	char hardSwitched = status->isHardSwitchedShunt ? 'h' : 'l';
 	char kelvin = status->isKelvinConnection ? 'k' : ' ';
 	if (status->isDataCurrent) {
-		printf("%02d %4d Vc=%.3f Vs=%.3f Is=%.3f It=%5.3f ", status->cellIndex,
-				status->cellId, asDouble(status->vCell), asDouble(status->vShunt), asDouble(status->iShunt),
-				asDouble(status->minCurrent));
+		printf("%02d %4d Vc=%.3f Is=%.3f It=%5.3f ", status->cellIndex, status->cellId,	asDouble(status->vCell),
+				asDouble(status->iShunt), asDouble(status->minCurrent));
 		if (status->hasTemperatureSensor) {
 			printf("t=%5.1f  ", asDouble(status->temperature) * 10);
 		} else {
 			printf("t=%5.1f* ", asDouble(status->temperature) * 10);
 		}
-		printf("s=%02d g=%02d %2ld %4hd%c%c%c%c %5d ", status->vShuntPot, status->gainPot,
-				status->latency / 1000, status->revision, isClean, shuntType, hardSwitched, kelvin,
-				status->errorCount);
+		printf("%2ld %4hd%c%c%c%c %5d ", status->latency / 1000, status->revision, isClean,
+				shuntType, hardSwitched, kelvin, status->errorCount);
 		unsigned char tens;
 		unsigned char hundreds;
 		if (status->vCell < 3000) {
