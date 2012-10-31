@@ -57,6 +57,7 @@ struct status_t {
 };
 
 struct battery_t {
+	unsigned char batteryIndex;
 	const char *name;
 	unsigned short cellCount;
 	struct status_t *cells;

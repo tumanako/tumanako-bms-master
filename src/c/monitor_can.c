@@ -114,6 +114,10 @@ void monitorCan_sendHardware(const unsigned char batteryIndex, const short cellI
 	monitorCan_sendChar2ShortsChar(0x3f4, batteryIndex, cellIndex, revision, value);
 }
 
+void monitorCan_sendError(const unsigned char batteryIndex, const short cellIndex, const short errorCount) {
+	monitorCan_sendChar2Shorts(0x3f5, batteryIndex, cellIndex, errorCount);
+}
+
 void monitorCan_sendChar2Shorts(const short frameId, const char c, const short s1, const short s2) {
 	struct can_frame frame;
 	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */

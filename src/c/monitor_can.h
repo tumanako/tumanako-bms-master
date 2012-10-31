@@ -32,5 +32,6 @@ void monitorCan_sendTemperature(const unsigned char batteryIndex, const short ce
 void monitorCan_sendHardware(const unsigned char batteryIndex, const short cellIndex,
 		const unsigned char hasKelvinConnection, const unsigned char hasResistorShunt,
 		const unsigned char hasTemperatureSensor, const unsigned short revision, const unsigned char isClean);
+void monitorCan_sendError(const unsigned char batteryIndex, const short cellIndex, const short errorCount);
 
 #endif /* TUMANAKO_CAN_H_ */

@@ -72,7 +72,7 @@ void moveCursor(unsigned char x, unsigned char y) {
 void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned short cellIndex, unsigned char offset) {
 	unsigned char x;
 	if (cellIndex % 2) {
-		x = 47;
+		x = 55;
 	} else {
 		x = 1;
 	}
@@ -213,6 +213,25 @@ void console_decode3f4(struct can_frame *frame, struct config_t *config) {
 	fflush(stdout);
 }
 
+/* Decode an error frame. */
+void console_decode3f5(struct can_frame *frame, struct config_t *config) {
+	unsigned char batteryIndex = bufToChar(frame->data);
+	if (batteryIndex > config->batteryCount) {
+		return;
+	}
+	struct config_battery_t *battery = config->batteries + batteryIndex;
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > battery->cellCount) {
+		return;
+	}
+	moveToCell(config, batteryIndex, cellIndex, 0);
+	fprintf(stdout, "%3d ", cellIndex);
+	fflush(stdout);
+	unsigned short errorCount = bufToShort(frame->data + 3);
+	moveToCell(config, batteryIndex, cellIndex, 46);
+	fprintf(stdout, "%4d", errorCount);
+	fflush(stdout);
+}
 
 void *console_backgroundThread(void *ptr) {
 	struct config_t *config = (struct config_t *) ptr;
@@ -245,6 +264,8 @@ void *console_backgroundThread(void *ptr) {
 			console_decode3f3(&frame, config);
 		} else if (frame.can_id == 0x3f4) {
 			console_decode3f4(&frame, config);
+		} else if (frame.can_id == 0x3f5) {
+			console_decode3f5(&frame, config);
 		} else {
 			continue;
 		}

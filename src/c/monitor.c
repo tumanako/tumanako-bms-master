@@ -49,7 +49,7 @@
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
-//#define CONSOLE
+#define CONSOLE
 
 #define CELL_ID_FILE "cells.txt"
 #define DEBUG 0
@@ -186,6 +186,7 @@ char getCellSummary(struct status_t *cell) {
 	char success = _getCellSummary(cell, 2);
 	if (!success) {
 		cell->errorCount++;
+		monitorCan_sendError(cell->battery->batteryIndex, cell->cellIndex, cell->errorCount);
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
 				cell->battery->name);
 		chargercontrol_shutdown();
@@ -389,6 +390,7 @@ char getCellState(struct status_t *cell) {
 	char success = _getCellState(cell, 2);
 	if (!success) {
 		cell->errorCount++;
+		monitorCan_sendError(cell->battery->batteryIndex, cell->cellIndex, cell->errorCount);
 		fprintf(stderr, "bus errors talking to cell %d (id %d) in %s, exiting\n", cell->cellIndex, cell->cellId,
 				cell->battery->name);
 		chargercontrol_shutdown();
@@ -873,9 +875,10 @@ unsigned char getCellVersion(struct status_t *cell) {
 		if (_getCellVersion(cell)) {
 			return TRUE;
 		}
+		cell->errorCount++;
+		monitorCan_sendError(cell->battery->batteryIndex, cell->cellIndex, cell->errorCount);
 	}
 	fprintf(stderr, "error getting version for cell %d (id %d)\n", cell->cellIndex, cell->cellId);
-	cell->errorCount++;
 	cell->version = -1;
 	return FALSE;
 }
@@ -924,6 +927,7 @@ void initData(struct config_t *config) {
 	data.batteries = malloc(sizeof(struct battery_t) * data.batteryCount);
 	for (unsigned char j = 0; j < data.batteryCount; j++) {
 		struct battery_t *battery = data.batteries + j;
+		battery->batteryIndex = j;
 		battery->name = config->batteries[j].name;
 		battery->cellCount = config->batteries[j].cellCount;
 		battery->cells = calloc(sizeof(struct status_t), battery->cellCount);
