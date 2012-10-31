@@ -62,6 +62,17 @@ void monitorCan_sendChar2ShortsChar(const short frameId, const char c, const sho
 	monitorCan_send(&frame);
 }
 
+void monitorCan_sendCharShortChar(const short frameId, const char c, const short s1, const char c2) {
+	struct can_frame frame;
+	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */
+	frame.can_id = frameId;
+	frame.can_dlc = 4;
+	charToBuf(c, frame.data);
+	shortToBuf(s1, frame.data + 1);
+	charToBuf(c2, frame.data + 3);
+	monitorCan_send(&frame);
+}
+
 /* Initialisation function, return 0 if successful */
 int monitorCan_init() {
 	s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -116,6 +127,10 @@ void monitorCan_sendHardware(const unsigned char batteryIndex, const short cellI
 
 void monitorCan_sendError(const unsigned char batteryIndex, const short cellIndex, const short errorCount) {
 	monitorCan_sendChar2Shorts(0x3f5, batteryIndex, cellIndex, errorCount);
+}
+
+void monitorCan_sendLatency(const unsigned char batteryIndex, const short cellIndex, const unsigned char latency) {
+	monitorCan_sendCharShortChar(0x3f6, batteryIndex, cellIndex, latency);
 }
 
 void monitorCan_sendChar2Shorts(const short frameId, const char c, const short s1, const short s2) {

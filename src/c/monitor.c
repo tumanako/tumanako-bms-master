@@ -171,6 +171,7 @@ char _getCellSummary(struct status_t *status, int maxAttempts) {
 			decodeSummary4(buf, status);
 		}
 		status->latency = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
+		monitorCan_sendLatency(status->battery->batteryIndex, status->cellIndex, status->latency / 1000);
 		break;
 	}
 	return 1;
