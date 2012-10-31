@@ -50,6 +50,18 @@ char monitorCan_send(struct can_frame *frame);
 /* CAN BUS socket */
 int s;
 
+void monitorCan_sendChar2ShortsChar(const short frameId, const char c, const short s1, const short s2, const char c2) {
+	struct can_frame frame;
+	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */
+	frame.can_id = frameId;
+	frame.can_dlc = 6;
+	charToBuf(c, frame.data);
+	shortToBuf(s1, frame.data + 1);
+	shortToBuf(s2, frame.data + 3);
+	charToBuf(c2, frame.data + 5);
+	monitorCan_send(&frame);
+}
+
 /* Initialisation function, return 0 if successful */
 int monitorCan_init() {
 	s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -81,6 +93,25 @@ void monitorCan_sendMinCurrent(const unsigned char batteryIndex, const short cel
 
 void monitorCan_sendTemperature(const unsigned char batteryIndex, const short cellIndex, const short temperature) {
 	monitorCan_sendChar2Shorts(0x3f3, batteryIndex, cellIndex, temperature);
+}
+
+void monitorCan_sendHardware(const unsigned char batteryIndex, const short cellIndex,
+		const unsigned char hasKelvinConnection, const unsigned char hasResistorShunt,
+		const unsigned char hasTemperatureSensor, const unsigned short revision, const unsigned char isClean) {
+	unsigned char value = 0;
+	if (hasKelvinConnection) {
+		value |= 0x1;
+	}
+	if (hasResistorShunt) {
+		value |= 0x2;
+	}
+	if (hasTemperatureSensor) {
+		value |= 0x4;
+	}
+	if (isClean) {
+		value |= 0x8;
+	}
+	monitorCan_sendChar2ShortsChar(0x3f4, batteryIndex, cellIndex, revision, value);
 }
 
 void monitorCan_sendChar2Shorts(const short frameId, const char c, const short s1, const short s2) {

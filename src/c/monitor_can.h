@@ -29,5 +29,8 @@ void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short ce
 void monitorCan_sendShuntCurrent(const unsigned char batteryIndex, const short cellIndex, const short iShunt);
 void monitorCan_sendMinCurrent(const unsigned char batteryIndex, const short cellIndex, const short minCurrent);
 void monitorCan_sendTemperature(const unsigned char batteryIndex, const short cellIndex, const short temperature);
+void monitorCan_sendHardware(const unsigned char batteryIndex, const short cellIndex,
+		const unsigned char hasKelvinConnection, const unsigned char hasResistorShunt,
+		const unsigned char hasTemperatureSensor, const unsigned short revision, const unsigned char isClean);
 
 #endif /* TUMANAKO_CAN_H_ */

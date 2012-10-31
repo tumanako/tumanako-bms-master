@@ -72,7 +72,7 @@ void moveCursor(unsigned char x, unsigned char y) {
 void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned short cellIndex, unsigned char offset) {
 	unsigned char x;
 	if (cellIndex % 2) {
-		x = 45;
+		x = 47;
 	} else {
 		x = 1;
 	}
@@ -182,11 +182,37 @@ void console_decode3f3(struct can_frame *frame, struct config_t *config) {
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
-	unsigned char temperature = bufToShort(frame->data + 3);
+	unsigned short temperature = bufToShort(frame->data + 3);
 	moveToCell(config, batteryIndex, cellIndex, 31);
-	fprintf(stdout, "t=%4.1f ", milliToDouble(temperature) * 100);
+	fprintf(stdout, "t=%4.1f ", milliToDouble(temperature) * 10);
 	fflush(stdout);
 }
+
+/* Decode a hardware config frame. */
+void console_decode3f4(struct can_frame *frame, struct config_t *config) {
+	unsigned char batteryIndex = bufToChar(frame->data);
+	if (batteryIndex > config->batteryCount) {
+		return;
+	}
+	struct config_battery_t *battery = config->batteries + batteryIndex;
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > battery->cellCount) {
+		return;
+	}
+	moveToCell(config, batteryIndex, cellIndex, 0);
+	fprintf(stdout, "%3d ", cellIndex);
+	fflush(stdout);
+	unsigned short revision = bufToShort(frame->data + 3);
+	moveToCell(config, batteryIndex, cellIndex, 38);
+	unsigned char value = bufToChar(frame->data + 5);
+	char isClean = value & 0x8 ? ' ' : '*';
+	char shuntType = value & 0x2 ? 'r' : ' ';
+	char hardSwitched = value & 0x4 ? 'h' : ' ';
+	char kelvin = value & 0x1 ? 'k' : ' ';
+	printf("%4hd%c%c%c%c", revision, isClean, shuntType, hardSwitched, kelvin);
+	fflush(stdout);
+}
+
 
 void *console_backgroundThread(void *ptr) {
 	struct config_t *config = (struct config_t *) ptr;
@@ -217,6 +243,8 @@ void *console_backgroundThread(void *ptr) {
 			console_decode3f2(&frame, config);
 		} else if (frame.can_id == 0x3f3) {
 			console_decode3f3(&frame, config);
+		} else if (frame.can_id == 0x3f4) {
+			console_decode3f4(&frame, config);
 		} else {
 			continue;
 		}

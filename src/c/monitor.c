@@ -271,12 +271,17 @@ int main() {
 
 	// findCells();
 
+	// clear the screen
+	write(1, "\E[H\E[2J", 7);
+
 	getSlaveVersions();
 	turnOffAllShunts();
 	sleep(1);
 
+#ifndef CONSOLE
 	// clear the screen
 	write(1, "\E[H\E[2J", 7);
+#endif
 
 	chargerState = 0;
 	time_t last = 0;
@@ -318,7 +323,7 @@ int main() {
 			chargercontrol_shutdown();
 			shutdown = 1;
 		}
-#ifdef CONSOLE
+#ifndef CONSOLE
 		printSummary();
 #endif
 		shuntPause = FALSE;
@@ -881,14 +886,20 @@ void getSlaveVersions() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
+#ifndef CONSOLE
 			printf("Checking cell %3d (id %4d) ...", j, cell->cellId);
+#endif
 			getCellVersion(cell);
 			char *resistorShunt = cell->isResistorShunt ? "resistorShunt" : "transistorShunt";
 			char *kelvinConnection = cell->isKelvinConnection ? "kelvin" : "noKelvin";
 			char *hardSwitchedShunt = cell->isHardSwitchedShunt ? "hardSwitched" : "adjustable";
+#ifndef CONSOLE
 			printf("... protocol version %2hhd %s %s %s r%d %s whenProgrammed %ld\n", cell->version,
 					kelvinConnection, resistorShunt, hardSwitchedShunt, cell->revision,
 					cell->isClean ? "clean" : "modified", cell->whenProgrammed);
+#endif
+			monitorCan_sendHardware(i, j, cell->isKelvinConnection, cell->isResistorShunt, cell->isHardSwitchedShunt,
+					cell->revision, cell->isClean);
 		}
 	}
 }
