@@ -72,7 +72,7 @@ void moveCursor(unsigned char x, unsigned char y) {
 void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned short cellIndex, unsigned char offset) {
 	unsigned char x;
 	if (cellIndex % 2) {
-		x = 57;
+		x = 88;
 	} else {
 		x = 1;
 	}
@@ -126,6 +126,42 @@ void console_decode3f0(struct can_frame *frame, struct config_t *config) {
 		maxVoltage = 0;
 		totalVoltage = 0;
 	}
+
+	unsigned short maxVoltageHundreds = maxVoltage / 100 * 100;
+	unsigned short barMin = 3000;
+	unsigned char tens;
+	unsigned char hundreds;
+	if (voltage < barMin) {
+		tens = 0;
+		hundreds = 0;
+	} else {
+		tens = (voltage / 10) % 10;
+		hundreds = ((voltage / 100 * 100) - barMin) / 100;
+	}
+	fprintf(stderr, "%d %d %d %d %d %d\n", voltage, maxVoltage, maxVoltageHundreds, barMin, tens, hundreds);
+	moveToCell(config, batteryIndex, cellIndex, 54);
+	for (int i = 0; i < hundreds; i++) {
+		if (i % 2) {
+			fprintf(stdout, "**********");
+		} else {
+			fprintf(stdout, "##########");
+		}
+	}
+	for (int i = 0; i < 10; i++) {
+		if (i < tens) {
+			fprintf(stdout, "-");
+		} else {
+			fprintf(stdout, " ");
+		}
+	}
+	if (hundreds < 2) {
+		printf("         ");
+	}
+	if (hundreds < 1) {
+		printf("         ");
+	}
+	fflush(stdout);
+
 }
 
 /* Decode a shunt current frame. */
