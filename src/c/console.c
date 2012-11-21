@@ -51,6 +51,7 @@ static unsigned short maxVoltageCell;
 static unsigned short minVoltage = 0xffff;
 static unsigned short minVoltageCell;
 static unsigned long totalVoltage = 0;
+static unsigned long totalVoltageCount = 0;
 
 int console_init(struct config_t *config) {
 	pthread_t consoleThread;
@@ -114,17 +115,21 @@ void console_decode3f0(struct can_frame *frame, struct config_t *config) {
 		minVoltage = voltage;
 		minVoltageCell = cellIndex;
 	}
+	totalVoltageCount++;
 	totalVoltage += voltage;
 	if (cellIndex == config->batteries[batteryIndex].cellCount - 1) {
-		moveToCell(config, batteryIndex, battery->cellCount, 0);
-		printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh", battery->name,
-				asDouble(minVoltage), minVoltageCell, asDouble(totalVoltage / battery->cellCount),
-				asDouble(maxVoltage), maxVoltageCell, asDouble(totalVoltage),
-				soc_getVoltage(), soc_getCurrent(), soc_getAh());
-		fflush(stdout);
+		if (totalVoltageCount == battery->cellCount) {
+			moveToCell(config, batteryIndex, battery->cellCount, 0);
+			printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh", battery->name,
+					asDouble(minVoltage), minVoltageCell, asDouble(totalVoltage / battery->cellCount),
+					asDouble(maxVoltage), maxVoltageCell, asDouble(totalVoltage),
+					soc_getVoltage(), soc_getCurrent(), soc_getAh());
+			fflush(stdout);
+		}
 		minVoltage = 0xffff;
 		maxVoltage = 0;
 		totalVoltage = 0;
+		totalVoltageCount = 0;
 	}
 
 	unsigned short maxVoltageHundreds = maxVoltage / 100 * 100;
