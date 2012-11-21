@@ -49,7 +49,6 @@
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
-#define CONSOLE
 
 #define CELL_ID_FILE "cells.txt"
 #define DEBUG 0
@@ -91,8 +90,6 @@ unsigned char setMinCurrent(struct status_t *cell, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
 void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
-void printSummary();
-void printCellDetail(struct status_t *status);
 double asDouble(int s);
 unsigned char turnOffAllShunts();
 char isAnyCellShunting();
@@ -226,11 +223,9 @@ int main() {
 		return 1;
 	}
 
-#ifdef CONSOLE
 	if (console_init(config)) {
 		return 1;
 	}
-#endif
 
 	buscontrol_setBus(TRUE);
 	fd = open(config->serialPort, O_RDWR | O_NOCTTY);
@@ -280,11 +275,6 @@ int main() {
 	turnOffAllShunts();
 	sleep(1);
 
-#ifndef CONSOLE
-	// clear the screen
-	write(1, "\E[H\E[2J", 7);
-#endif
-
 	chargerState = 0;
 	time_t last = 0;
 	char shutdown = 0;
@@ -325,9 +315,6 @@ int main() {
 			chargercontrol_shutdown();
 			shutdown = 1;
 		}
-#ifndef CONSOLE
-		printSummary();
-#endif
 		shuntPause = FALSE;
 		unsigned char shuntValueChanged = FALSE;
 		for (unsigned char i = 0; i < data.batteryCount; i++) {
@@ -362,9 +349,6 @@ void getCellStates() {
 			struct status_t *cell = battery->cells + j;
 			char success = getCellSummary(cell);
 			cell->isDataCurrent = success;
-#ifndef CONSOLE
-			printCellDetail(cell);
-#endif
 			if (!success) {
 				continue;
 			}
@@ -779,66 +763,6 @@ void dumpBuffer(unsigned char *buf, int length) {
 	}
 }
 
-void printSummary() {
-	write(1, "\E[0J", 4);
-	printf("\n");
-	for (unsigned char i = 0; i < data.batteryCount; i++) {
-		struct battery_t *battery = data.batteries + i;
-		write(1, "\E[0J", 4);
-		printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh %s\n", battery->name,
-				asDouble(minVoltage(battery)), minVoltageCell(battery), asDouble(avgVoltage(battery)),
-				asDouble(maxVoltage(battery)), maxVoltageCell(battery), asDouble(totalVoltage(battery)),
-				soc_getVoltage(), soc_getCurrent(), soc_getAh(), chargerState ? "on" : "off");
-	}
-	// TODO clear to the bottom of the screen
-}
-
-void printCellDetail(struct status_t *status) {
-	if (status->minCurrent > 0) {
-		write(1, "\E[31m", 5);
-	} else {
-		write(1, "\E[m", 3);
-	}
-	char isClean = status->isClean ? ' ' : '*';
-	char shuntType = status->isResistorShunt ? 'r' : 't';
-	char hardSwitched = status->isHardSwitchedShunt ? 'h' : 'l';
-	char kelvin = status->isKelvinConnection ? 'k' : ' ';
-	if (status->isDataCurrent) {
-		printf("%02d %4d Vc=%.3f Is=%.3f It=%5.3f ", status->cellIndex, status->cellId,	asDouble(status->vCell),
-				asDouble(status->iShunt), asDouble(status->minCurrent));
-		if (status->hasTemperatureSensor) {
-			printf("t=%5.1f  ", asDouble(status->temperature) * 10);
-		} else {
-			printf("t=%5.1f* ", asDouble(status->temperature) * 10);
-		}
-		printf("%2ld %4hd%c%c%c%c %5d ", status->latency / 1000, status->revision, isClean,
-				shuntType, hardSwitched, kelvin, status->errorCount);
-		unsigned char tens;
-		unsigned char hundreds;
-		if (status->vCell < 3000) {
-			tens = 0;
-			hundreds = 0;
-		} else {
-			tens = (status->vCell / 10) % 10;
-			hundreds = (status->vCell / 100) % 10;
-		}
-		for (int j = 0; j < hundreds; j++) {
-			for (int k = 0; k < 10; k++) {
-				printf("*");
-			}
-		}
-		for (int j = 0; j < tens; j++) {
-			printf("-");
-		}
-	} else {
-		printf("%02d %4d Bad Data                                                 %4hhd%c %5d ", status->cellIndex,
-				status->cellId, status->revision, isClean, status->errorCount);
-	}
-	write(1, "\E[K", 3);
-	printf("\n");
-	fflush(NULL);
-}
-
 double asDouble(int s) {
 	return ((double) s) / 1000;
 }
@@ -890,18 +814,10 @@ void getSlaveVersions() {
 		struct battery_t *battery = data.batteries + i;
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
-#ifndef CONSOLE
-			printf("Checking cell %3d (id %4d) ...", j, cell->cellId);
-#endif
 			getCellVersion(cell);
 			char *resistorShunt = cell->isResistorShunt ? "resistorShunt" : "transistorShunt";
 			char *kelvinConnection = cell->isKelvinConnection ? "kelvin" : "noKelvin";
 			char *hardSwitchedShunt = cell->isHardSwitchedShunt ? "hardSwitched" : "adjustable";
-#ifndef CONSOLE
-			printf("... protocol version %2hhd %s %s %s r%d %s whenProgrammed %ld\n", cell->version,
-					kelvinConnection, resistorShunt, hardSwitchedShunt, cell->revision,
-					cell->isClean ? "clean" : "modified", cell->whenProgrammed);
-#endif
 			monitorCan_sendHardware(i, j, cell->isKelvinConnection, cell->isResistorShunt, cell->isHardSwitchedShunt,
 					cell->revision, cell->isClean);
 		}
