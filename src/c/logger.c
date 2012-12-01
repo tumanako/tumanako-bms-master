@@ -62,7 +62,6 @@ struct threadArguments_t {
 extern int readFrame(int s, struct can_frame *frame);
 void logger_decode3f0(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
 void logger_decode3f1(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
-void logger_decode3f2(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
 void logger_decode3f3(struct can_frame *frame, struct logger_status_t *cells, struct threadArguments_t *);
 void *logger_backgroundThread(void *ptr);
 time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short cellCount, FILE *out);
@@ -127,8 +126,6 @@ void *logger_backgroundThread(void *ptr) {
 					logger_decode3f0(&frame, cells, args);
 				} else if (frame.can_id == 0x3f1) {
 					logger_decode3f1(&frame, cells, args);
-				} else if (frame.can_id == 0x3f2) {
-					logger_decode3f2(&frame, cells, args);
 				} else if (frame.can_id == 0x3f3) {
 					logger_decode3f3(&frame, cells, args);
 				}
@@ -224,20 +221,6 @@ void logger_decode3f1(struct can_frame *frame, struct logger_status_t cells[], s
 	}
 	cells[cellIndex].shuntCurrent = bufToShort(frame->data + 3);
 	cells[cellIndex].valued |= 0x02;
-}
-
-/* Decode a minCurrent frame. */
-void logger_decode3f2(struct can_frame *frame, struct logger_status_t cells[], struct threadArguments_t *args) {
-	unsigned char batteryId = bufToChar(frame->data);
-	if (batteryId != args->batteryId) {
-		return;
-	}
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > args->cellCount) {
-		return;
-	}
-	cells[cellIndex].minCurrent = bufToShort(frame->data + 3);
-	cells[cellIndex].valued |= 0x04;
 }
 
 /* Decode a temperature frame. */
