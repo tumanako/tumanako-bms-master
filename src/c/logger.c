@@ -181,7 +181,7 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 int countCellsWithData(struct logger_status_t cells[], short cellCount) {
 	int result = 0;
 	for (unsigned short i = 0; i < cellCount; i++) {
-		if (cells[i].valued == 0x0f) {
+		if (cells[i].valued == 0x07) {
 			result++;
 		}
 	}
@@ -234,6 +234,6 @@ void logger_decode3f3(struct can_frame *frame, struct logger_status_t cells[], s
 		return;
 	}
 	cells[cellIndex].temperature = bufToShort(frame->data + 3);
-	cells[cellIndex].valued |= 0x08;
+	cells[cellIndex].valued |= 0x04;
 }
 
