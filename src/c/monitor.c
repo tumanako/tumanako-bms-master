@@ -193,6 +193,37 @@ char getCellSummary(struct status_t *cell) {
 	return TRUE;
 }
 
+/** turn shunting off on any cells without a kelvin connection and with a resistor shunt */
+unsigned char turnOffNonKelvinResistorShunts() {
+	unsigned char changed = 0;
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			struct status_t *cell = battery->cells + j;
+			if (!cell->isKelvinConnection && cell->isResistorShunt) {
+				changed |= setMinCurrent(cell, 0);
+			}
+		}
+	}
+	return changed;
+}
+
+/** turn shunting off on any cells without a kelvin connection and with a transistor shunt */
+unsigned char turnOffNonKelvinTransistorShunts() {
+	unsigned char changed = 0;
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			struct status_t *cell = battery->cells + j;
+			if (!cell->isKelvinConnection && !cell->isResistorShunt) {
+				changed |= setMinCurrent(cell, 0);
+			}
+		}
+	}
+	return changed;
+}
+
+
 int main() {
 	struct termios oldtio, newtio;
 
@@ -278,27 +309,47 @@ int main() {
 	chargerState = 0;
 	time_t last = 0;
 	char shutdown = 0;
-	while (1) {
+	for (int count = 0; TRUE; count++) {
 		time_t t;
 		time(&t);
 		if (t < last + config->loopDelay) {
 			sleep(1);
 			continue;
 		}
+		last = t;
 		if (config->loopDelay > 30) {
 			// if the slaves have gone to sleep, send some characters to wake them up
 			writeWithEscape('a');
 			// wait for slaves to wake up and take a measurement
 			sleep(2);
 		}
-		last = t;
-		if (!HAS_KELVIN_CONNECTION) {
-			if (turnOffAllShunts()) {
-				shuntPause = TRUE;
-				sleep(1);
-			}
+
+		// if necessary, turn off shunts and read the voltage
+		shuntPause = turnOffNonKelvinResistorShunts();
+		if (count % 5 == 0) {
+			shuntPause = turnOffNonKelvinTransistorShunts() || shuntPause;
+		}
+		if (shuntPause) {
+			// give cells time to read their real voltage
+			sleep(2);
 		}
 		getCellStates();
+
+		// turn (back) on any shunts that are needed
+		shuntPause = FALSE;
+		unsigned char shuntValueChanged = FALSE;
+		for (unsigned char i = 0; i < data.batteryCount; i++) {
+			shuntValueChanged |= setShuntCurrent(config, &data.batteries[i]);
+		}
+		// if we turned on any shunts, read the shunt current
+		if (shuntValueChanged) {
+			// give cells a chance re-read
+			sleep(2);
+			// read the current
+			getCellStates();
+		}
+
+		// do charger control stuff
 		if (maxVoltageInAnyBattery() > CHARGER_OFF_VOLTAGE) {
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
@@ -310,31 +361,12 @@ int main() {
 				chargerState = 1;
 			}
 		}
+
+		// do error checking stuff
 		if (soc_getError()) {
 			fprintf(stderr, "State of Charge error?");
 			chargercontrol_shutdown();
 			shutdown = 1;
-		}
-		shuntPause = FALSE;
-		unsigned char shuntValueChanged = FALSE;
-		for (unsigned char i = 0; i < data.batteryCount; i++) {
-			shuntValueChanged |= setShuntCurrent(config, &data.batteries[i]);
-		}
-		if (shuntValueChanged) {
-			// give cells a chance re-read
-			sleep(1);
-		}
-		fflush(NULL);
-
-		// If we don't have a kelvin connection then we will be turning off the shunts to read the voltages.
-		// This causes problems because the cells are quite slow to turn on the shunts. Here we read the
-		// shunt current a few times without turning off the shunts to let them have time to do their work
-		//
-		// TODO implement "suspend" command to tell slaves to stop shunting and store their shunt config for
-		// later fast re-enabling
-		for (int j = 0; !HAS_KELVIN_CONNECTION && isAnyCellShunting() && j < 5; j++) {
-			sleep(10);
-			getCellStates();
 		}
 	}
 	tcsetattr(fd, TCSANOW, &oldtio);
