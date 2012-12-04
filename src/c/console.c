@@ -315,22 +315,28 @@ void *console_backgroundThread(void *ptr) {
 		if (readFrame(s, &frame)) {
 			return NULL;
 		}
-		if (frame.can_id == 0x3f0) {
+		switch (frame.can_id) {
+		case 0x3f0:
 			console_decode3f0(&frame, config);
-		} else if (frame.can_id == 0x3f1) {
+			break;
+		case 0x3f1:
 			console_decode3f1(&frame, config);
-		} else if (frame.can_id == 0x3f2) {
+			break;
+		case 0x3f2:
 			console_decode3f2(&frame, config);
-		} else if (frame.can_id == 0x3f3) {
+			break;
+		case 0x3f3:
 			console_decode3f3(&frame, config);
-		} else if (frame.can_id == 0x3f4) {
+			break;
+		case 0x3f4:
 			console_decode3f4(&frame, config);
-		} else if (frame.can_id == 0x3f5) {
+			break;
+		case 0x3f5:
 			console_decode3f5(&frame, config);
-		} else if (frame.can_id == 0x3f6) {
+			break;
+		case 0x3f6:
 			console_decode3f6(&frame, config);
-		} else {
-			continue;
+			break;
 		}
 	}
 	return NULL;
