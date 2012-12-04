@@ -120,10 +120,9 @@ void console_decode3f0(struct can_frame *frame, struct config_t *config) {
 	if (cellIndex == config->batteries[batteryIndex].cellCount - 1) {
 		if (totalVoltageCount == battery->cellCount) {
 			moveToCell(config, batteryIndex, battery->cellCount, 0);
-			printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV %6.2fV %7.2fA %7.2fAh", battery->name,
+			printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV", battery->name,
 					asDouble(minVoltage), minVoltageCell, asDouble(totalVoltage / battery->cellCount),
-					asDouble(maxVoltage), maxVoltageCell, asDouble(totalVoltage),
-					soc_getVoltage(), soc_getCurrent(), soc_getAh());
+					asDouble(maxVoltage), maxVoltageCell, asDouble(totalVoltage));
 			fflush(stdout);
 		}
 		minVoltage = 0xffff;
@@ -294,6 +293,14 @@ void console_decode3f6(struct can_frame *frame, struct config_t *config) {
 	fflush(stdout);
 }
 
+/** nasty hack to update the state of charge, should listen to an event from the SOC module */
+void console_printSoc(struct config_t *config) {
+	struct config_battery_t *battery = config->batteries + 2;
+	moveToCell(config, 2, battery->cellCount, 54);
+	printf("%6.2fV %7.2fA %7.2fAh", soc_getVoltage(), soc_getCurrent(), soc_getAh());
+	fflush(stdout);
+}
+
 void *console_backgroundThread(void *ptr) {
 	struct config_t *config = (struct config_t *) ptr;
 
@@ -336,6 +343,11 @@ void *console_backgroundThread(void *ptr) {
 			break;
 		case 0x3f6:
 			console_decode3f6(&frame, config);
+			break;
+		case 0x703:
+		case 0x705:
+		case 0x701:
+			console_printSoc(config);
 			break;
 		}
 	}
