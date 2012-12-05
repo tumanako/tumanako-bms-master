@@ -390,9 +390,11 @@ void getCellStates() {
 			}
 			if (!shuntPause) {
 				monitorCan_sendShuntCurrent(i, j, cell->iShunt);
+				monitorCan_sendMinCurrent(i, j, cell->minCurrent);
 			}
-			monitorCan_sendMinCurrent(i, j, cell->minCurrent);
-			monitorCan_sendTemperature(i, j, cell->temperature);
+			if (cell->hasTemperatureSensor) {
+				monitorCan_sendTemperature(i, j, cell->temperature);
+			}
 		}
 	}
 }

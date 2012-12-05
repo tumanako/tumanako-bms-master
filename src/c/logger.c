@@ -158,8 +158,11 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 				// we haven't had any data, make sure we don't log anything until we do
 				return now;
 			}
-			if (now - last < 20) {
-				// we had complete data less than 5 seconds ago, wait some more
+			// todo, this is too long during motoring, but expected during charging with
+			// non kelvin connected transistor shunts. Either choose a short delay for
+			// motoring or make the transistor shunts faster
+			if (now - last < 120) {
+				// we had complete data less than 2 minutes ago, wait some more
 				return last;
 			}
 		}
@@ -181,7 +184,7 @@ time_t logger_writeLogLine(time_t last, struct logger_status_t cells[], short ce
 int countCellsWithData(struct logger_status_t cells[], short cellCount) {
 	int result = 0;
 	for (unsigned short i = 0; i < cellCount; i++) {
-		if (cells[i].valued == 0x07) {
+		if ((cells[i].valued & 0x01) && (cells[i].valued & 0x2)) {
 			result++;
 		}
 	}
