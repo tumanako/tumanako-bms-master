@@ -293,6 +293,16 @@ void console_decode3f6(struct can_frame *frame, struct config_t *config) {
 	fflush(stdout);
 }
 
+/* Decode a charger state frame. */
+void console_decode3f8(struct can_frame *frame, struct config_t *config) {
+	unsigned char shutdown = bufToChar(frame->data);
+	unsigned char state = bufToChar(frame->data + 1);
+	unsigned char reason = bufToChar(frame->data + 2);
+	moveToCell(config, config->batteryCount - 1, config->batteries[config->batteryCount - 1].cellCount + 1, 0);
+	fprintf(stdout, "%x %x %x", shutdown, state, reason);
+	fflush(stdout);
+}
+
 /** nasty hack to update the state of charge, should listen to an event from the SOC module */
 void console_printSoc(struct config_t *config) {
 	struct config_battery_t *battery = config->batteries + 2;
@@ -343,6 +353,9 @@ void *console_backgroundThread(void *ptr) {
 			break;
 		case 0x3f6:
 			console_decode3f6(&frame, config);
+			break;
+		case 0x3f8:
+			console_decode3f8(&frame, config);
 			break;
 		case 0x703:
 		case 0x705:

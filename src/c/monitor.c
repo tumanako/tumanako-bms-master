@@ -56,6 +56,7 @@
 #define CHARGER_RELAY_PORT 7
 #define CHARGER_ON_VOLTAGE 3550
 #define CHARGER_OFF_VOLTAGE 3650
+#define END_OF_CHARGE_VOLTAGE 3500
 #define SHUNT_MAX_CURRENT 300
 #define FORCED_SHUNT_OFF_VOLTAGE 3530
 #define CHARGE_CURRENT_OVERSAMPLING 5
@@ -103,8 +104,6 @@ unsigned char shuntPause = 0;
 int fd;
 
 struct monitor_t data;
-
-char chargerState = 0;
 
 void decodeSummary3(unsigned char *buf, struct status_t *to) {
 	if (!shuntPause) {
@@ -172,6 +171,28 @@ char _getCellSummary(struct status_t *status, int maxAttempts) {
 		break;
 	}
 	return 1;
+}
+
+/**
+ * Currently we control the charger in only one of our batteries, this hack will go away
+ * when we can express this in the configuration file
+ */
+unsigned short minVoltageInTheChargingBattery() {
+	if (data.batteryCount != 3) {
+		return 0xffff;
+	}
+	return minVoltage(&data.batteries[2]);
+}
+
+/**
+ * Currently we control the charger in only one of our batteries, this hack will go away
+ * when we can express this in the configuration file
+ */
+unsigned short maxVoltageInTheChargingBattery() {
+	if (data.batteryCount != 3) {
+		return 0;
+	}
+	return maxVoltage(&data.batteries[2]);
 }
 
 char getCellSummary(struct status_t *cell) {
@@ -306,9 +327,10 @@ int main() {
 	turnOffAllShunts();
 	sleep(1);
 
-	chargerState = 0;
 	time_t last = 0;
 	char shutdown = 0;
+	char chargerState = 0;
+	char chargerStateChangeReason = 0;
 	for (int count = 0; TRUE; count++) {
 		time_t t;
 		time(&t);
@@ -350,17 +372,42 @@ int main() {
 		}
 
 		// do charger control stuff
-		if (maxVoltageInAnyBattery() > CHARGER_OFF_VOLTAGE) {
+		if (shutdown) {
+			// charging is finished or we had an error
 			chargercontrol_setCharger(FALSE);
-			chargerState = 0;
-			shutdown = 1;
-		}
-		if (maxVoltageInAnyBattery() < CHARGER_ON_VOLTAGE || chargerState) {
-			if (!shutdown) {
+		} else if (chargerState == 1) {
+			chargercontrol_setCharger(TRUE);
+			// charger is on, find a reason to turn it off
+			if (maxVoltageInTheChargingBattery() > CHARGER_OFF_VOLTAGE) {
+				// over voltage, turn off the charger
+				chargercontrol_setCharger(FALSE);
+				chargerState = 0;
+				chargerStateChangeReason = 1;
+			} else if (minVoltageInTheChargingBattery() > END_OF_CHARGE_VOLTAGE && soc_getCurrent() > -4) {
+				// charging is finished
+				chargercontrol_setCharger(FALSE);
+				chargerState = 0;
+				chargerStateChangeReason = 2;
+				shutdown = TRUE;
+			} else if (soc_getCurrent() > -3) {
+				// charging current is too low
+				chargercontrol_setCharger(FALSE);
+				chargerState = 0;
+				chargerStateChangeReason = 3;
+			}
+		} else {
+			chargercontrol_setCharger(FALSE);
+			// charger is off, find a reason to turn it on
+			if (maxVoltageInTheChargingBattery() < CHARGER_ON_VOLTAGE) {
+				// battery voltage is low, charger should switch on
 				chargercontrol_setCharger(TRUE);
 				chargerState = 1;
+				chargerStateChangeReason = 4;
+				// give the charger time to stabilize
+				sleep(10);
 			}
 		}
+		monitorCan_sendChargerState(shutdown, chargerState, chargerStateChangeReason);
 
 		// do error checking stuff
 		if (soc_getError()) {
