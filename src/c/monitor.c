@@ -54,11 +54,10 @@
 #define DEBUG 0
 #define HAS_KELVIN_CONNECTION 0
 #define CHARGER_RELAY_PORT 7
-#define CHARGER_ON_VOLTAGE 3550
+#define CHARGER_ON_VOLTAGE 3450
 #define CHARGER_OFF_VOLTAGE 3650
 #define END_OF_CHARGE_VOLTAGE 3500
-#define SHUNT_MAX_CURRENT 300
-#define FORCED_SHUNT_OFF_VOLTAGE 3530
+#define SHUNT_MAX_CURRENT 150
 #define CHARGE_CURRENT_OVERSAMPLING 5
 
 #define ESCAPE_CHARACTER 0xff
@@ -413,7 +412,7 @@ int main() {
 		if (soc_getError()) {
 			fprintf(stderr, "State of Charge error?");
 			chargercontrol_shutdown();
-			shutdown = 1;
+			shutdown = TRUE;
 		}
 	}
 	tcsetattr(fd, TCSANOW, &oldtio);
