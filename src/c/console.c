@@ -226,21 +226,10 @@ void console_decode3f5(struct can_frame *frame, struct config_t *config) {
 	fflush(stdout);
 }
 
-/* Decode a latency frame. */
-void console_decode3f6(struct can_frame *frame, struct config_t *config) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+void latencyListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char latency) {
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3hu ", cellIndex);
 	fflush(stdout);
-	unsigned char latency = bufToChar(frame->data + 3);
 	moveToCell(config, batteryIndex, cellIndex, 51);
 	fprintf(stdout, "%2hhu", latency);
 	fflush(stdout);
@@ -288,9 +277,6 @@ void *console_backgroundThread(void *unused __attribute__ ((unused))) {
 		case 0x3f5:
 			console_decode3f5(&frame, config);
 			break;
-		case 0x3f6:
-			console_decode3f6(&frame, config);
-			break;
 		case 0x3f8:
 			console_decode3f8(&frame, config);
 			break;
@@ -313,5 +299,6 @@ int console_init(struct config_t *configArg) {
 	canEventListener_registerMinCurrentListener(minCurrentListener);
 	canEventListener_registerTemperatureListener(temperatureListener);
 	canEventListener_registerCellConfigListener(cellConfigListener);
+	canEventListener_registerLatencyListener(latencyListener);
 	return 0;
 }
