@@ -2,14 +2,17 @@
 # Makefile for U3 examples
 #
 
-# CHARGER_CONTROL_SRC=chargercontrol_labjack.c /home/tparker/labjack2/Linux_C_NativeUSB/Examples/U3/u3.c
-# CHARGER_CONTROL_CFLAGS=-I/home/tparker/labjack2/Linux_C_NativeUSB/Examples/U3
-# CHARGER_CONTROL_LDFLAGS=-L/home/tparker/labjack2/Linux_C_NativeUSB/liblabjackusb/3
-# CHARGER_CONTROL_LIBS=-llabjackusb
-CHARGER_CONTROL_SRC=chargercontrol_none.c
-CHARGER_CONTROL_CFLAGS=
-CHARGER_CONTROL_LDFLAGS=
-CHARGER_CONTROL_LIBS=
+LIB_LABJACK_USB = ../../../../../exodriver
+
+CHARGER_CONTROL_SRC=chargercontrol_labjack.c $(LIB_LABJACK_USB)/examples/U3/u3.c
+CHARGER_CONTROL_CFLAGS=-I$(LIB_LABJACK_USB)/liblabjackusb -I$(LIB_LABJACK_USB)/examples/U3
+#CHARGER_CONTROL_LDFLAGS=-L$(LIB_LABJACK_USB)/liblabjackusb 
+CHARGER_CONTROL_LDFLAGS=-lusb-1.0 $(LIB_LABJACK_USB)/liblabjackusb/labjackusb.o
+#CHARGER_CONTROL_LIBS=-llabjackusb
+#CHARGER_CONTROL_SRC=chargercontrol_none.c
+#CHARGER_CONTROL_CFLAGS=
+#CHARGER_CONTROL_LDFLAGS=
+#CHARGER_CONTROL_LIBS=
 MONITOR_SRC=monitor.c crc.c soc_evision.c monitor_can.c logger.c util.c config.c console.c $(CHARGER_CONTROL_SRC)
 MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 
