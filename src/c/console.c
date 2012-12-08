@@ -26,17 +26,6 @@
 #include <libgen.h>
 #include <time.h>
 
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <sys/uio.h>
-#include <net/if.h>
-
-#include <linux/can.h>
-#include <linux/if.h>
-#include <linux/can/raw.h>
-
 #include <pthread.h>
 
 #include "soc.h"
