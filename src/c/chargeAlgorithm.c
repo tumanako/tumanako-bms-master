@@ -41,6 +41,8 @@ static time_t whenChargerOn = 0;
 static char chargerShutdown = 0;
 static char chargerState = 0;
 static char chargerStateChangeReason = 0;
+static unsigned short count;
+static char errorLastTime = 0;
 
 static void doChargerControl() {
 	// do error checking stuff
@@ -48,6 +50,15 @@ static void doChargerControl() {
 		fprintf(stderr, "State of Charge error?");
 		chargerShutdown = TRUE;
 		chargerStateChangeReason = 5;
+	}
+	if (count != config->batteries[2].cellCount) {
+		if (errorLastTime) {
+			fprintf(stderr, "State of Charge error?");
+			chargerShutdown = TRUE;
+			chargerStateChangeReason = 6;
+		} else {
+			errorLastTime = TRUE;
+		}
 	}
 
 	// do charger control stuff
@@ -107,11 +118,13 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 	if (voltage < minVoltage) {
 		minVoltage = voltage;
 	}
+	count++;
 	if (cellIndex == config->batteries[2].cellCount - 1) {
 		fprintf(stderr, "doing charge control %d %d\n", minVoltage, maxVoltage);
 		doChargerControl();
 		maxVoltage = 0;
 		minVoltage = 0xffff;
+		count = 0;
 	}
 }
 
