@@ -21,6 +21,9 @@
 #ifndef CAN_EVENT_LISTENER_H
 #define CAN_EVENT_LISTENER_H
 
+#include <sys/socket.h>
+#include <linux/can.h>
+
 #include "config.h"
 
 extern void canEventListener_init(struct config_t *_config);
@@ -32,6 +35,7 @@ extern void canEventListener_registerCellConfigListener(void (*cellConfigListene
 extern void canEventListener_registerErrorListener(void (*cellConfigListener)(unsigned char, unsigned short, unsigned short));
 extern void canEventListener_registerLatencyListener(void (*cellConfigListener)(unsigned char, unsigned short, unsigned char));
 extern void canEventListener_registerChargerStateListener(void (*chargerStateListener)(unsigned char, unsigned char, unsigned char));
+extern void canEventListener_registerRawCanListener(void (*rawCanListener)(struct can_frame *frame));
 
 extern volatile char canEventListener_error;
 

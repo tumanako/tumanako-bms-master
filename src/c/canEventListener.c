@@ -57,6 +57,7 @@ static void (*cellConfigListeners[10])(unsigned char, unsigned short, unsigned s
 static void (*errorListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*latencyListeners[10])(unsigned char, unsigned short, unsigned char);
 static void (*chargerStateListeners[10])(unsigned char, unsigned char, unsigned char);
+static void (*rawCanListeners[10])(struct can_frame *frame);
 
 volatile char canEventListener_error = 1;
 
@@ -152,15 +153,15 @@ static void decodeFrame(struct can_frame *frame) {
 	case 0x3f8:
 		decodeChargerState(frame);
 		break;
-//	case 0x703:
-//	case 0x705:
-//	case 0x701:
-//		console_printSoc(config);
-//		break;
+	default:
+		for (int i = 0; rawCanListeners[i]; i++) {
+			rawCanListeners[i](frame);
+		}
+		break;
 	}
 }
 
-static int readFrame(int s, struct can_frame *frame) {
+int readFrame(int s, struct can_frame *frame) {
 	ssize_t nbytes = read(s, frame, sizeof(struct can_frame));
 
 	if (nbytes < 0) {
@@ -264,4 +265,12 @@ void canEventListener_registerChargerStateListener(void (*chargerStateListener)(
 		i++;
 	}
 	chargerStateListeners[i] = chargerStateListener;
+}
+
+void canEventListener_registerRawCanListener(void (*rawCanListener)(struct can_frame *frame)) {
+	int i = 0;
+	while (rawCanListeners[i] != NULL) {
+		i++;
+	}
+	rawCanListeners[i] = rawCanListener;
 }

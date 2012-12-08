@@ -29,20 +29,8 @@
 #include <libgen.h>
 #include <time.h>
 
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <sys/uio.h>
-#include <net/if.h>
-
-#include <linux/can.h>
-#include <linux/if.h>
-#include <linux/can/raw.h>
-
-#include <pthread.h>
-
 #include "soc.h"
+#include "canEventListener.h"
 
 volatile unsigned short volts = 0;
 volatile long chargeCurrent = 0;
@@ -125,58 +113,17 @@ static void printFrame(struct can_frame *frame) {
 	printf("\n");
 }
 
-static int readFrame(int s, struct can_frame *frame) {
-	ssize_t nbytes = read(s, frame, sizeof(struct can_frame));
-
-	if (nbytes < 0) {
-		perror("can raw socket read");
-		return 1;
+void rawCanListener(struct can_frame *frame) {
+	if (frame->can_id == 0x703) {
+		decode703(frame);
+	} else if (frame->can_id == 0x705) {
+		decode705(frame);
+	} else if (frame->can_id == 0x701) {
+		decode701(frame);
 	}
-
-	/* paranoid check ... */
-	if (nbytes < (int) sizeof(struct can_frame)) {
-		fprintf(stderr, "read: incomplete CAN frame\n");
-		return 1;
-	}
-	return 0;
-}
-
-static void *backgroundThread(void *unused __attribute__ ((unused))) {
-	struct can_frame frame;
-
-	int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-
-	struct ifreq ifr;
-	strcpy(ifr.ifr_name, "slcan0");
-	ioctl(s, SIOCGIFINDEX, &ifr);
-
-	struct sockaddr_can addr;
-	addr.can_family = AF_CAN;
-	addr.can_ifindex = ifr.ifr_ifindex;
-
-	bind(s, (struct sockaddr *) &addr, sizeof(addr));
-
-	while (1) {
-		if (readFrame(s, &frame)) {
-			error = 1;
-			return NULL;
-		}
-		if (frame.can_id == 0x703) {
-			decode703(&frame);
-		} else if (frame.can_id == 0x705) {
-			decode705(&frame);
-		} else if (frame.can_id == 0x701) {
-			decode701(&frame);
-		} else {
-			continue;
-		}
-	}
-	return NULL;
 }
 
 int soc_init() {
-	pthread_t thread1;
-	pthread_create( &thread1, NULL, backgroundThread, (void*) "unused");
+	canEventListener_registerRawCanListener(rawCanListener);
 	return 0;
 }
-
