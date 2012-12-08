@@ -180,12 +180,14 @@ static void minCurrentListener(unsigned char batteryIndex, unsigned short cellIn
 }
 
 static void temperatureListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short temperature) {
+	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
 	moveToCell(config, batteryIndex, cellIndex, 31);
 	fprintf(stdout, "t=%4.1f ", milliToDouble(temperature) * 10);
 	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
 }
 
 /* Decode a hardware config frame. */
