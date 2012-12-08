@@ -87,7 +87,7 @@ void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned sh
 	moveCursor(x + offset, batteryOffset + cellIndex / 2);
 }
 
-void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short voltage) {
+static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short voltage) {
 	pthread_mutex_lock(&mutex);
 	struct config_battery_t *battery = config->batteries + batteryIndex;
 	moveToCell(config, batteryIndex, cellIndex, 0);
@@ -131,7 +131,7 @@ void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsig
 		tens = (voltage / 10) % 10;
 		hundreds = ((voltage / 100 * 100) - barMin) / 100;
 	}
-	//fprintf(stderr, "%d %d %d %d %d %d\n", voltage, maxVoltage, maxVoltageHundreds, barMin, tens, hundreds);
+	fprintf(stderr, "%d %d %d %d %d %d\n", voltage, maxVoltage, maxVoltageHundreds, barMin, tens, hundreds);
 	moveToCell(config, batteryIndex, cellIndex, 54);
 	for (int i = 0; i < hundreds; i++) {
 		if (i % 2) {
@@ -157,7 +157,7 @@ void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsig
 	pthread_mutex_unlock(&mutex);
 }
 
-void shuntCurrentListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short shuntCurrent) {
+static void shuntCurrentListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short shuntCurrent) {
 	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
@@ -291,7 +291,7 @@ void console_printSoc(struct config_t *config) {
 	fflush(stdout);
 }
 
-void *console_backgroundThread(void *ptr) {
+void *console_backgroundThread(void *unused __attribute__ ((unused))) {
 	struct can_frame frame;
 
 	int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
