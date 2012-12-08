@@ -42,6 +42,7 @@
 #include "soc.h"
 #include "util.h"
 #include "config.h"
+#include "canEventListener.h"
 
 extern int readFrame(int s, struct can_frame *frame);
 void *console_backgroundThread(void *ptr);
@@ -53,12 +54,9 @@ static unsigned short minVoltageCell;
 static unsigned long totalVoltage = 0;
 static unsigned long totalVoltageCount = 0;
 
-int console_init(struct config_t *config) {
-	pthread_t consoleThread;
-	pthread_create(&consoleThread, NULL, console_backgroundThread, (void *) config);
-
-	return 0;
-}
+static struct config_t *config;
+static pthread_t thread;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static double asDouble(int s) {
 	return ((double) s) / 1000;
@@ -89,21 +87,12 @@ void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned sh
 	moveCursor(x + offset, batteryOffset + cellIndex / 2);
 }
 
-/* Decode a voltage frame. */
-void console_decode3f0(struct can_frame *frame, struct config_t *config) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
+void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short voltage) {
+	pthread_mutex_lock(&mutex);
 	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
-	unsigned short voltage = bufToShort(frame->data + 3);
 	moveToCell(config, batteryIndex, cellIndex, 4);
 	fprintf(stdout, "Vc=%.3f ", milliToDouble(voltage));
 	fflush(stdout);
@@ -142,7 +131,7 @@ void console_decode3f0(struct can_frame *frame, struct config_t *config) {
 		tens = (voltage / 10) % 10;
 		hundreds = ((voltage / 100 * 100) - barMin) / 100;
 	}
-	fprintf(stderr, "%d %d %d %d %d %d\n", voltage, maxVoltage, maxVoltageHundreds, barMin, tens, hundreds);
+	//fprintf(stderr, "%d %d %d %d %d %d\n", voltage, maxVoltage, maxVoltageHundreds, barMin, tens, hundreds);
 	moveToCell(config, batteryIndex, cellIndex, 54);
 	for (int i = 0; i < hundreds; i++) {
 		if (i % 2) {
@@ -165,27 +154,18 @@ void console_decode3f0(struct can_frame *frame, struct config_t *config) {
 		printf("         ");
 	}
 	fflush(stdout);
-
+	pthread_mutex_unlock(&mutex);
 }
 
-/* Decode a shunt current frame. */
-void console_decode3f1(struct can_frame *frame, struct config_t *config) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+void shuntCurrentListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short shuntCurrent) {
+	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
-	unsigned short shuntCurrent = bufToShort(frame->data + 3);
 	moveToCell(config, batteryIndex, cellIndex, 13);
 	printf("Is=%.3f ", milliToDouble(shuntCurrent));
 	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
 }
 
 /* Decode a minCurrent frame. */
@@ -312,8 +292,6 @@ void console_printSoc(struct config_t *config) {
 }
 
 void *console_backgroundThread(void *ptr) {
-	struct config_t *config = (struct config_t *) ptr;
-
 	struct can_frame frame;
 
 	int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -332,13 +310,8 @@ void *console_backgroundThread(void *ptr) {
 		if (readFrame(s, &frame)) {
 			return NULL;
 		}
+		pthread_mutex_lock(&mutex);
 		switch (frame.can_id) {
-		case 0x3f0:
-			console_decode3f0(&frame, config);
-			break;
-		case 0x3f1:
-			console_decode3f1(&frame, config);
-			break;
 		case 0x3f2:
 			console_decode3f2(&frame, config);
 			break;
@@ -363,6 +336,15 @@ void *console_backgroundThread(void *ptr) {
 			console_printSoc(config);
 			break;
 		}
+		pthread_mutex_unlock(&mutex);
 	}
 	return NULL;
+}
+
+int console_init(struct config_t *configArg) {
+	config = configArg;
+	pthread_create(&thread, NULL, console_backgroundThread, (void *) "unused");
+	canEventListener_registerVoltageListener(voltageListener);
+	canEventListener_registerShuntCurrentListener(shuntCurrentListener);
+	return 0;
 }

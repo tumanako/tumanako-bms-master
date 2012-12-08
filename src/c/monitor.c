@@ -254,6 +254,8 @@ int main() {
 	}
 	initData(config);
 
+	canEventListener_init(config);
+
 	if (chargercontrol_init()) {
 		return 1;
 	}
