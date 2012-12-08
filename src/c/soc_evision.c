@@ -39,7 +39,9 @@ volatile long chargeCurrent = 0;
 volatile long dischargeCurrent = 0;
 volatile short aH = 0;
 volatile short halfVoltage = 0;
-volatile char error = 0;
+
+time_t lastValidCurrent;
+time_t lastValidVoltage;
 
 /**
  * Make a short from the 16 bits starting at c
@@ -90,17 +92,21 @@ double soc_getHalfVoltage() {
 }
 
 char soc_getError() {
-	return error;
+	time_t now;
+	time(&now);
+	return now - lastValidVoltage > 5 || now - lastValidCurrent > 5;
 }
 
 static void decode701(struct can_frame *frame) {
 	dischargeCurrent = make24BitLong(frame->data + 4);
 	chargeCurrent = make24BitLong(frame->data);
+	time(&lastValidCurrent);
 }
 
 static void decode703(struct can_frame *frame) {
 	volts = makeShort(frame->data + 1);
 	halfVoltage = makeShort(frame->data + 4);
+	time(&lastValidVoltage);
 }
 
 static void decode705(struct can_frame *frame) {
@@ -131,6 +137,8 @@ void rawCanListener(struct can_frame *frame) {
 }
 
 int soc_init() {
+	time(&lastValidCurrent);
+	time(&lastValidVoltage);
 	canEventListener_registerRawCanListener(rawCanListener);
 	return 0;
 }
