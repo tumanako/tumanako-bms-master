@@ -190,29 +190,20 @@ static void temperatureListener(unsigned char batteryIndex, unsigned short cellI
 	pthread_mutex_unlock(&mutex);
 }
 
-/* Decode a hardware config frame. */
-void console_decode3f4(struct can_frame *frame, struct config_t *config) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+static void cellConfigListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short revision,
+		unsigned char cellConfig) {
+	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
-	unsigned short revision = bufToShort(frame->data + 3);
 	moveToCell(config, batteryIndex, cellIndex, 38);
-	unsigned char value = bufToChar(frame->data + 5);
-	char isClean = value & 0x8 ? ' ' : '*';
-	char shuntType = value & 0x2 ? 'r' : ' ';
-	char hardSwitched = value & 0x4 ? 'h' : ' ';
-	char kelvin = value & 0x1 ? 'k' : ' ';
+	char isClean = cellConfig & 0x8 ? ' ' : '*';
+	char shuntType = cellConfig & 0x2 ? 'r' : ' ';
+	char hardSwitched = cellConfig & 0x4 ? 'h' : ' ';
+	char kelvin = cellConfig & 0x1 ? 'k' : ' ';
 	printf("%4hd%c%c%c%c", revision, isClean, shuntType, hardSwitched, kelvin);
 	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
 }
 
 /* Decode an error frame. */
@@ -294,9 +285,6 @@ void *console_backgroundThread(void *unused __attribute__ ((unused))) {
 		}
 		pthread_mutex_lock(&mutex);
 		switch (frame.can_id) {
-		case 0x3f4:
-			console_decode3f4(&frame, config);
-			break;
 		case 0x3f5:
 			console_decode3f5(&frame, config);
 			break;
@@ -324,5 +312,6 @@ int console_init(struct config_t *configArg) {
 	canEventListener_registerShuntCurrentListener(shuntCurrentListener);
 	canEventListener_registerMinCurrentListener(minCurrentListener);
 	canEventListener_registerTemperatureListener(temperatureListener);
+	canEventListener_registerCellConfigListener(cellConfigListener);
 	return 0;
 }

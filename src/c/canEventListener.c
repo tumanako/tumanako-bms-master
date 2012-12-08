@@ -53,6 +53,7 @@ static void (*voltageListeners[10])(unsigned char, unsigned short, unsigned shor
 static void (*shuntCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*minCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*temperatureListeners[10])(unsigned char, unsigned short, unsigned short);
+static void (*cellConfigListeners[10])(unsigned char, unsigned short, unsigned short, unsigned char);
 
 volatile char canEventListener_error = 1;
 
@@ -70,6 +71,24 @@ static void decodeBatteryCellShort(struct can_frame *frame, void (*listeners[])(
 
 	for (int i = 0; listeners[i]; i++) {
 		listeners[i](batteryIndex, cellIndex, value);
+	}
+}
+
+static void decodeCellConfig(struct can_frame *frame) {
+	unsigned char batteryIndex = bufToChar(frame->data);
+	if (batteryIndex > config->batteryCount) {
+		return;
+	}
+	struct config_battery_t *battery = config->batteries + batteryIndex;
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > battery->cellCount) {
+		return;
+	}
+	unsigned short revision = bufToShort(frame->data + 3);
+	unsigned short cellConfig = bufToChar(frame->data + 5);
+
+	for (int i = 0; cellConfigListeners[i]; i++) {
+		cellConfigListeners[i](batteryIndex, cellIndex, revision, cellConfig);
 	}
 }
 
@@ -91,9 +110,9 @@ static void decodeFrame(struct can_frame *frame) {
 		// temperature frame
 		decodeBatteryCellShort(frame, temperatureListeners);
 		break;
-//	case 0x3f4:
-//		console_decode3f4(&frame, config);
-//		break;
+	case 0x3f4:
+		decodeCellConfig(frame);
+		break;
 //	case 0x3f5:
 //		console_decode3f5(&frame, config);
 //		break;
@@ -187,4 +206,12 @@ void canEventListener_registerMinCurrentListener(void (*minCurrentListener)(unsi
 
 void canEventListener_registerTemperatureListener(void (*temperatureListener)(unsigned char, unsigned short, unsigned short)) {
 	registerListener(temperatureListener, temperatureListeners);
+}
+
+void canEventListener_registerCellConfigListener(void (*cellConfigListener)(unsigned char, unsigned short, unsigned short, unsigned char)) {
+	int i = 0;
+	while (cellConfigListeners[i] != NULL) {
+		i++;
+	}
+	cellConfigListeners[i] = cellConfigListener;
 }

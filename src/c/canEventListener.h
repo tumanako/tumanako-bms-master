@@ -28,6 +28,7 @@ extern void canEventListener_registerVoltageListener(void (*voltageListener)(uns
 extern void canEventListener_registerShuntCurrentListener(void (*shuntCurrentListener)(unsigned char, unsigned short, unsigned short));
 extern void canEventListener_registerMinCurrentListener(void (*minCurrentListener)(unsigned char, unsigned short, unsigned short));
 extern void canEventListener_registerTemperatureListener(void (*temperatureListener)(unsigned char, unsigned short, unsigned short));
+extern void canEventListener_registerCellConfigListener(void (*cellConfigListener)(unsigned char, unsigned short, unsigned short, unsigned char));
 
 extern volatile char canEventListener_error;
 
