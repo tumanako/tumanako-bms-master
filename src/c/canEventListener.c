@@ -51,6 +51,7 @@ static struct config_t *config;
 
 static void (*voltageListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*shuntCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
+static void (*minCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
 
 volatile char canEventListener_error = 1;
 
@@ -88,6 +89,23 @@ static void decodeCurrent(struct can_frame *frame) {
 	}
 }
 
+static void decodeMinCurrent(struct can_frame *frame) {
+	unsigned char batteryIndex = bufToChar(frame->data);
+	if (batteryIndex > config->batteryCount) {
+		return;
+	}
+	struct config_battery_t *battery = config->batteries + batteryIndex;
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > battery->cellCount) {
+		return;
+	}
+	unsigned short minCurrent = bufToShort(frame->data + 3);
+
+	for (int i = 0; voltageListeners[i]; i++) {
+		minCurrentListeners[i](batteryIndex, cellIndex, minCurrent);
+	}
+}
+
 static void decodeFrame(struct can_frame *frame) {
 	switch (frame->can_id) {
 	case 0x3f0:
@@ -96,9 +114,9 @@ static void decodeFrame(struct can_frame *frame) {
 	case 0x3f1:
 		decodeCurrent(frame);
 		break;
-//	case 0x3f2:
-//		console_decode3f2(&frame, config);
-//		break;
+	case 0x3f2:
+		decodeMinCurrent(frame);
+		break;
 //	case 0x3f3:
 //		console_decode3f3(&frame, config);
 //		break;
@@ -189,4 +207,12 @@ void canEventListener_registerShuntCurrentListener(void (*shuntCurrentListener)(
 		i++;
 	}
 	shuntCurrentListeners[i] = shuntCurrentListener;
+}
+
+void canEventListener_registerMinCurrentListener(void (*minCurrentListener)(unsigned char, unsigned short, unsigned short)) {
+	int i = 0;
+	while (minCurrentListeners[i] != NULL) {
+		i++;
+	}
+	minCurrentListeners[i] = minCurrentListener;
 }
