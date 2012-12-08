@@ -32,6 +32,8 @@
 #include "soc.h"
 #include "canEventListener.h"
 
+static void (*socEventListeners[10])();
+
 volatile unsigned short volts = 0;
 volatile long chargeCurrent = 0;
 volatile long dischargeCurrent = 0;
@@ -120,10 +122,23 @@ void rawCanListener(struct can_frame *frame) {
 		decode705(frame);
 	} else if (frame->can_id == 0x701) {
 		decode701(frame);
+	} else {
+		return;
+	}
+	for (int i = 0; socEventListeners[i]; i++) {
+		socEventListeners[i]();
 	}
 }
 
 int soc_init() {
 	canEventListener_registerRawCanListener(rawCanListener);
 	return 0;
+}
+
+void soc_registerSocEventListener(void (*socEventListener)()) {
+	int i = 0;
+	while (socEventListeners[i] != NULL) {
+		i++;
+	}
+	socEventListeners[i] = socEventListener;
 }

@@ -276,9 +276,7 @@ int main() {
 		return 1;
 	}
 
-	if (console_init(config)) {
-		return 1;
-	}
+	console_init(config);
 
 	buscontrol_setBus(TRUE);
 	fd = open(config->serialPort, O_RDWR | O_NOCTTY);

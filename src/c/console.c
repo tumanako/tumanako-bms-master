@@ -43,9 +43,7 @@
 #include "util.h"
 #include "config.h"
 #include "canEventListener.h"
-
-extern int readFrame(int s, struct can_frame *frame);
-void *console_backgroundThread(void *ptr);
+#include "console.h"
 
 static unsigned short maxVoltage = 0;
 static unsigned short maxVoltageCell;
@@ -55,7 +53,6 @@ static unsigned long totalVoltage = 0;
 static unsigned long totalVoltageCount = 0;
 
 static struct config_t *config;
-static pthread_t thread;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static double asDouble(int s) {
@@ -229,53 +226,24 @@ static void latencyListener(unsigned char batteryIndex, unsigned short cellIndex
 }
 
 static void chargerStateListener(unsigned char shutdown, unsigned char state, unsigned char reason) {
+	pthread_mutex_lock(&mutex);
 	moveToCell(config, config->batteryCount - 1, config->batteries[config->batteryCount - 1].cellCount + 1, 0);
 	fprintf(stdout, "%x %x %x", shutdown, state, reason);
 	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
 }
 
-void console_printSoc(struct config_t *config) {
+static void console_printSoc() {
+	pthread_mutex_lock(&mutex);
 	struct config_battery_t *battery = config->batteries + 2;
 	moveToCell(config, 2, battery->cellCount, 54);
 	printf("%6.2fV %7.2fA %7.2fAh", soc_getVoltage(), soc_getCurrent(), soc_getAh());
 	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
 }
 
-void *console_backgroundThread(void *unused __attribute__ ((unused))) {
-	struct can_frame frame;
-
-	int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-
-	struct ifreq ifr;
-	strcpy(ifr.ifr_name, "slcan0");
-	ioctl(s, SIOCGIFINDEX, &ifr);
-
-	struct sockaddr_can addr;
-	addr.can_family = AF_CAN;
-	addr.can_ifindex = ifr.ifr_ifindex;
-
-	bind(s, (struct sockaddr *) &addr, sizeof(addr));
-
-	while (1) {
-		if (readFrame(s, &frame)) {
-			return NULL;
-		}
-		pthread_mutex_lock(&mutex);
-		switch (frame.can_id) {
-		case 0x703:
-		case 0x705:
-		case 0x701:
-			console_printSoc(config);
-			break;
-		}
-		pthread_mutex_unlock(&mutex);
-	}
-	return NULL;
-}
-
-int console_init(struct config_t *configArg) {
+void console_init(struct config_t *configArg) {
 	config = configArg;
-	pthread_create(&thread, NULL, console_backgroundThread, (void *) "unused");
 	canEventListener_registerVoltageListener(voltageListener);
 	canEventListener_registerShuntCurrentListener(shuntCurrentListener);
 	canEventListener_registerMinCurrentListener(minCurrentListener);
@@ -284,5 +252,5 @@ int console_init(struct config_t *configArg) {
 	canEventListener_registerErrorListener(errorListener);
 	canEventListener_registerLatencyListener(latencyListener);
 	canEventListener_registerChargerStateListener(chargerStateListener);
-	return 0;
+	soc_registerSocEventListener(console_printSoc);
 }

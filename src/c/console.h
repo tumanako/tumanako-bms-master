@@ -18,4 +18,4 @@
  <http://www.gnu.org/licenses/>.
  */
 
-int console_init(struct config_t *config);
+void console_init(struct config_t *config);
