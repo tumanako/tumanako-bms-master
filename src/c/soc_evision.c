@@ -44,15 +44,6 @@
 
 #include "soc.h"
 
-int readFrame(int s, struct can_frame *frame);
-void decode701(struct can_frame *frame);
-void decode703(struct can_frame *frame);
-void decode705(struct can_frame *frame);
-void printFrame(struct can_frame *frame);
-unsigned short makeShort(__u8 *c);
-unsigned long make24BitLong(__u8 *c);
-static void *backgroundThread(void *ptr);
-
 volatile unsigned short volts = 0;
 volatile long chargeCurrent = 0;
 volatile long dischargeCurrent = 0;
@@ -60,10 +51,30 @@ volatile short aH = 0;
 volatile short halfVoltage = 0;
 volatile char error = 0;
 
-int soc_init() {
-	pthread_t thread1;
-	pthread_create( &thread1, NULL, backgroundThread, (void*) "unused");
-	return 0;
+/**
+ * Make a short from the 16 bits starting at c
+ *
+ * TODO deal with endian
+ */
+static unsigned short makeShort(__u8 *c) {
+	unsigned short result = *c;
+	result = result << 8;
+	result = result | *(c + 1);
+	return result;
+}
+
+/**
+ * Make a long from the 24 bits starting at c
+ *
+ * TODO deal with endian
+ */
+static unsigned long make24BitLong(__u8 *c) {
+	unsigned long result = c[0];
+	result = result << 8;
+	result = result | c[1];
+	result = result << 8;
+	result = result | c[2];
+	return result;
 }
 
 double soc_getCurrent() {
@@ -90,6 +101,44 @@ double soc_getHalfVoltage() {
 
 char soc_getError() {
 	return error;
+}
+
+static void decode701(struct can_frame *frame) {
+	dischargeCurrent = make24BitLong(frame->data + 4);
+	chargeCurrent = make24BitLong(frame->data);
+}
+
+static void decode703(struct can_frame *frame) {
+	volts = makeShort(frame->data + 1);
+	halfVoltage = makeShort(frame->data + 4);
+}
+
+static void decode705(struct can_frame *frame) {
+	aH = makeShort(frame->data + 1);
+}
+
+static void printFrame(struct can_frame *frame) {
+	printf("%x %d ", frame->can_id, frame->can_dlc);
+	for (int i = 0; i < frame->can_dlc; i++) {
+		printf("%02x", frame->data[i]);
+	}
+	printf("\n");
+}
+
+static int readFrame(int s, struct can_frame *frame) {
+	ssize_t nbytes = read(s, frame, sizeof(struct can_frame));
+
+	if (nbytes < 0) {
+		perror("can raw socket read");
+		return 1;
+	}
+
+	/* paranoid check ... */
+	if (nbytes < (int) sizeof(struct can_frame)) {
+		fprintf(stderr, "read: incomplete CAN frame\n");
+		return 1;
+	}
+	return 0;
 }
 
 static void *backgroundThread(void *unused __attribute__ ((unused))) {
@@ -125,67 +174,9 @@ static void *backgroundThread(void *unused __attribute__ ((unused))) {
 	return NULL;
 }
 
-void decode701(struct can_frame *frame) {
-	dischargeCurrent = make24BitLong(frame->data + 4);
-	chargeCurrent = make24BitLong(frame->data);
-}
-
-void decode703(struct can_frame *frame) {
-	volts = makeShort(frame->data + 1);
-	halfVoltage = makeShort(frame->data + 4);
-}
-
-void decode705(struct can_frame *frame) {
-	aH = makeShort(frame->data + 1);
-}
-
-/**
- * Make a short from the 16 bits starting at c
- *
- * TODO deal with endian
- */
-unsigned short makeShort(__u8 *c) {
-	unsigned short result = *c;
-	result = result << 8;
-	result = result | *(c + 1);
-	return result;
-}
-
-/**
- * Make a long from the 24 bits starting at c
- *
- * TODO deal with endian
- */
-unsigned long make24BitLong(__u8 *c) {
-	unsigned long result = c[0];
-	result = result << 8;
-	result = result | c[1];
-	result = result << 8;
-	result = result | c[2];
-	return result;
-}
-
-void printFrame(struct can_frame *frame) {
-	printf("%x %d ", frame->can_id, frame->can_dlc);
-	for (int i = 0; i < frame->can_dlc; i++) {
-		printf("%02x", frame->data[i]);
-	}
-	printf("\n");
-}
-
-int readFrame(int s, struct can_frame *frame) {
-	ssize_t nbytes = read(s, frame, sizeof(struct can_frame));
-
-	if (nbytes < 0) {
-		perror("can raw socket read");
-		return 1;
-	}
-
-	/* paranoid check ... */
-	if (nbytes < (int) sizeof(struct can_frame)) {
-		fprintf(stderr, "read: incomplete CAN frame\n");
-		return 1;
-	}
+int soc_init() {
+	pthread_t thread1;
+	pthread_create( &thread1, NULL, backgroundThread, (void*) "unused");
 	return 0;
 }
 
