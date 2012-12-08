@@ -206,21 +206,10 @@ static void cellConfigListener(unsigned char batteryIndex, unsigned short cellIn
 	pthread_mutex_unlock(&mutex);
 }
 
-/* Decode an error frame. */
-void console_decode3f5(struct can_frame *frame, struct config_t *config) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+void errorListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short errorCount) {
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
-	unsigned short errorCount = bufToShort(frame->data + 3);
 	moveToCell(config, batteryIndex, cellIndex, 46);
 	fprintf(stdout, "%4d", errorCount);
 	fflush(stdout);
@@ -274,9 +263,6 @@ void *console_backgroundThread(void *unused __attribute__ ((unused))) {
 		}
 		pthread_mutex_lock(&mutex);
 		switch (frame.can_id) {
-		case 0x3f5:
-			console_decode3f5(&frame, config);
-			break;
 		case 0x3f8:
 			console_decode3f8(&frame, config);
 			break;
@@ -299,6 +285,7 @@ int console_init(struct config_t *configArg) {
 	canEventListener_registerMinCurrentListener(minCurrentListener);
 	canEventListener_registerTemperatureListener(temperatureListener);
 	canEventListener_registerCellConfigListener(cellConfigListener);
+	canEventListener_registerErrorListener(errorListener);
 	canEventListener_registerLatencyListener(latencyListener);
 	return 0;
 }

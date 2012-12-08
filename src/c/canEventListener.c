@@ -54,6 +54,7 @@ static void (*shuntCurrentListeners[10])(unsigned char, unsigned short, unsigned
 static void (*minCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*temperatureListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*cellConfigListeners[10])(unsigned char, unsigned short, unsigned short, unsigned char);
+static void (*errorListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*latencyListeners[10])(unsigned char, unsigned short, unsigned char);
 
 volatile char canEventListener_error = 1;
@@ -130,9 +131,9 @@ static void decodeFrame(struct can_frame *frame) {
 	case 0x3f4:
 		decodeCellConfig(frame);
 		break;
-//	case 0x3f5:
-//		console_decode3f6(&frame, config);
-//		break;
+	case 0x3f5:
+		decodeBatteryCellShort(frame, errorListeners);
+		break;
 	case 0x3f6:
 		decodeLatency(frame);
 		break;
@@ -231,6 +232,10 @@ void canEventListener_registerCellConfigListener(void (*cellConfigListener)(unsi
 		i++;
 	}
 	cellConfigListeners[i] = cellConfigListener;
+}
+
+void canEventListener_registerErrorListener(void (*errorListener)(unsigned char, unsigned short, unsigned short)) {
+	registerListener(errorListener, errorListeners);
 }
 
 void canEventListener_registerLatencyListener(void (*latencyListener)(unsigned char, unsigned short, unsigned char)) {
