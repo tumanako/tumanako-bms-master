@@ -55,7 +55,7 @@ static void (*minCurrentListeners[10])(unsigned char, unsigned short, unsigned s
 
 volatile char canEventListener_error = 1;
 
-static void decodeVoltage(struct can_frame *frame) {
+static void decodeBatteryCellShort(struct can_frame *frame, void (*listeners[])(unsigned char, unsigned short, unsigned short)) {
 	unsigned char batteryIndex = bufToChar(frame->data);
 	if (batteryIndex > config->batteryCount) {
 		return;
@@ -65,57 +65,26 @@ static void decodeVoltage(struct can_frame *frame) {
 	if (cellIndex > battery->cellCount) {
 		return;
 	}
-	unsigned short voltage = bufToShort(frame->data + 3);
+	unsigned short value = bufToShort(frame->data + 3);
 
-	for (int i = 0; voltageListeners[i]; i++) {
-		voltageListeners[i](batteryIndex, cellIndex, voltage);
-	}
-}
-
-static void decodeCurrent(struct can_frame *frame) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
-	unsigned short shuntCurrent = bufToShort(frame->data + 3);
-
-	for (int i = 0; voltageListeners[i]; i++) {
-		shuntCurrentListeners[i](batteryIndex, cellIndex, shuntCurrent);
-	}
-}
-
-static void decodeMinCurrent(struct can_frame *frame) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
-	unsigned short minCurrent = bufToShort(frame->data + 3);
-
-	for (int i = 0; voltageListeners[i]; i++) {
-		minCurrentListeners[i](batteryIndex, cellIndex, minCurrent);
+	for (int i = 0; listeners[i]; i++) {
+		listeners[i](batteryIndex, cellIndex, value);
 	}
 }
 
 static void decodeFrame(struct can_frame *frame) {
 	switch (frame->can_id) {
 	case 0x3f0:
-		decodeVoltage(frame);
+		// voltage frame
+		decodeBatteryCellShort(frame, voltageListeners);
 		break;
 	case 0x3f1:
-		decodeCurrent(frame);
+		// shunt current frame
+		decodeBatteryCellShort(frame, shuntCurrentListeners);
 		break;
 	case 0x3f2:
-		decodeMinCurrent(frame);
+		// min current frame
+		decodeBatteryCellShort(frame, minCurrentListeners);
 		break;
 //	case 0x3f3:
 //		console_decode3f3(&frame, config);
@@ -193,26 +162,23 @@ void canEventListener_init(struct config_t *_config) {
 	pthread_create(&thread, NULL, backgroundThread, "unused");
 }
 
-void canEventListener_registerVoltageListener(void (*voltageListener)(unsigned char, unsigned short, unsigned short)) {
+void registerListener(void (*listener)(unsigned char, unsigned short, unsigned short),
+		void (*listeners[])(unsigned char, unsigned short, unsigned short)) {
 	int i = 0;
-	while (voltageListeners[i] != NULL) {
+	while (listeners[i] != NULL) {
 		i++;
 	}
-	voltageListeners[i] = voltageListener;
+	listeners[i] = listener;
+}
+
+void canEventListener_registerVoltageListener(void (*voltageListener)(unsigned char, unsigned short, unsigned short)) {
+	registerListener(voltageListener, voltageListeners);
 }
 
 void canEventListener_registerShuntCurrentListener(void (*shuntCurrentListener)(unsigned char, unsigned short, unsigned short)) {
-	int i = 0;
-	while (shuntCurrentListeners[i] != NULL) {
-		i++;
-	}
-	shuntCurrentListeners[i] = shuntCurrentListener;
+	registerListener(shuntCurrentListener, shuntCurrentListeners);
 }
 
 void canEventListener_registerMinCurrentListener(void (*minCurrentListener)(unsigned char, unsigned short, unsigned short)) {
-	int i = 0;
-	while (minCurrentListeners[i] != NULL) {
-		i++;
-	}
-	minCurrentListeners[i] = minCurrentListener;
+	registerListener(minCurrentListener, minCurrentListeners);
 }
