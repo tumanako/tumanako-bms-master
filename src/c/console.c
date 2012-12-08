@@ -206,7 +206,7 @@ static void cellConfigListener(unsigned char batteryIndex, unsigned short cellIn
 	pthread_mutex_unlock(&mutex);
 }
 
-void errorListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short errorCount) {
+static void errorListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short errorCount) {
 	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
@@ -217,7 +217,7 @@ void errorListener(unsigned char batteryIndex, unsigned short cellIndex, unsigne
 	pthread_mutex_unlock(&mutex);
 }
 
-void latencyListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char latency) {
+static void latencyListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char latency) {
 	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3hu ", cellIndex);
@@ -228,17 +228,12 @@ void latencyListener(unsigned char batteryIndex, unsigned short cellIndex, unsig
 	pthread_mutex_unlock(&mutex);
 }
 
-/* Decode a charger state frame. */
-void console_decode3f8(struct can_frame *frame, struct config_t *config) {
-	unsigned char shutdown = bufToChar(frame->data);
-	unsigned char state = bufToChar(frame->data + 1);
-	unsigned char reason = bufToChar(frame->data + 2);
+static void chargerStateListener(unsigned char shutdown, unsigned char state, unsigned char reason) {
 	moveToCell(config, config->batteryCount - 1, config->batteries[config->batteryCount - 1].cellCount + 1, 0);
 	fprintf(stdout, "%x %x %x", shutdown, state, reason);
 	fflush(stdout);
 }
 
-/** nasty hack to update the state of charge, should listen to an event from the SOC module */
 void console_printSoc(struct config_t *config) {
 	struct config_battery_t *battery = config->batteries + 2;
 	moveToCell(config, 2, battery->cellCount, 54);
@@ -267,9 +262,6 @@ void *console_backgroundThread(void *unused __attribute__ ((unused))) {
 		}
 		pthread_mutex_lock(&mutex);
 		switch (frame.can_id) {
-		case 0x3f8:
-			console_decode3f8(&frame, config);
-			break;
 		case 0x703:
 		case 0x705:
 		case 0x701:
@@ -291,5 +283,6 @@ int console_init(struct config_t *configArg) {
 	canEventListener_registerCellConfigListener(cellConfigListener);
 	canEventListener_registerErrorListener(errorListener);
 	canEventListener_registerLatencyListener(latencyListener);
+	canEventListener_registerChargerStateListener(chargerStateListener);
 	return 0;
 }

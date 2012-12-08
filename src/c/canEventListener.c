@@ -56,6 +56,7 @@ static void (*temperatureListeners[10])(unsigned char, unsigned short, unsigned 
 static void (*cellConfigListeners[10])(unsigned char, unsigned short, unsigned short, unsigned char);
 static void (*errorListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*latencyListeners[10])(unsigned char, unsigned short, unsigned char);
+static void (*chargerStateListeners[10])(unsigned char, unsigned char, unsigned char);
 
 volatile char canEventListener_error = 1;
 
@@ -105,8 +106,19 @@ static void decodeLatency(struct can_frame *frame) {
 		return;
 	}
 	unsigned char latency = bufToChar(frame->data + 3);
-	for (int i = 0; cellConfigListeners[i]; i++) {
+
+	for (int i = 0; latencyListeners[i]; i++) {
 		latencyListeners[i](batteryIndex, cellIndex, latency);
+	}
+}
+
+static void decodeChargerState(struct can_frame *frame) {
+	unsigned char shutdown = bufToChar(frame->data);
+	unsigned char state = bufToChar(frame->data + 1);
+	unsigned char reason = bufToChar(frame->data + 2);
+
+	for (int i = 0; chargerStateListeners[i]; i++) {
+		chargerStateListeners[i](shutdown, state, reason);
 	}
 }
 
@@ -137,9 +149,9 @@ static void decodeFrame(struct can_frame *frame) {
 	case 0x3f6:
 		decodeLatency(frame);
 		break;
-//	case 0x3f8:
-//		console_decode3f8(&frame, config);
-//		break;
+	case 0x3f8:
+		decodeChargerState(frame);
+		break;
 //	case 0x703:
 //	case 0x705:
 //	case 0x701:
@@ -244,4 +256,12 @@ void canEventListener_registerLatencyListener(void (*latencyListener)(unsigned c
 		i++;
 	}
 	latencyListeners[i] = latencyListener;
+}
+
+void canEventListener_registerChargerStateListener(void (*chargerStateListener)(unsigned char, unsigned char, unsigned char)) {
+	int i = 0;
+	while (chargerStateListeners[i] != NULL) {
+		i++;
+	}
+	chargerStateListeners[i] = chargerStateListener;
 }

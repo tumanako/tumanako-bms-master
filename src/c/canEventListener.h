@@ -31,6 +31,7 @@ extern void canEventListener_registerTemperatureListener(void (*temperatureListe
 extern void canEventListener_registerCellConfigListener(void (*cellConfigListener)(unsigned char, unsigned short, unsigned short, unsigned char));
 extern void canEventListener_registerErrorListener(void (*cellConfigListener)(unsigned char, unsigned short, unsigned short));
 extern void canEventListener_registerLatencyListener(void (*cellConfigListener)(unsigned char, unsigned short, unsigned char));
+extern void canEventListener_registerChargerStateListener(void (*chargerStateListener)(unsigned char, unsigned char, unsigned char));
 
 extern volatile char canEventListener_error;
 
