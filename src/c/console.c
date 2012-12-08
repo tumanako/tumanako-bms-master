@@ -179,21 +179,10 @@ static void minCurrentListener(unsigned char batteryIndex, unsigned short cellIn
 	pthread_mutex_unlock(&mutex);
 }
 
-/* Decode a temperature frame. */
-void console_decode3f3(struct can_frame *frame, struct config_t *config) {
-	unsigned char batteryIndex = bufToChar(frame->data);
-	if (batteryIndex > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryIndex;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+static void temperatureListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short temperature) {
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
-	unsigned short temperature = bufToShort(frame->data + 3);
 	moveToCell(config, batteryIndex, cellIndex, 31);
 	fprintf(stdout, "t=%4.1f ", milliToDouble(temperature) * 10);
 	fflush(stdout);
@@ -303,9 +292,6 @@ void *console_backgroundThread(void *unused __attribute__ ((unused))) {
 		}
 		pthread_mutex_lock(&mutex);
 		switch (frame.can_id) {
-		case 0x3f3:
-			console_decode3f3(&frame, config);
-			break;
 		case 0x3f4:
 			console_decode3f4(&frame, config);
 			break;
@@ -335,5 +321,6 @@ int console_init(struct config_t *configArg) {
 	canEventListener_registerVoltageListener(voltageListener);
 	canEventListener_registerShuntCurrentListener(shuntCurrentListener);
 	canEventListener_registerMinCurrentListener(minCurrentListener);
+	canEventListener_registerTemperatureListener(temperatureListener);
 	return 0;
 }

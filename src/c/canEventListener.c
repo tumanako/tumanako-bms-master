@@ -52,6 +52,7 @@ static struct config_t *config;
 static void (*voltageListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*shuntCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*minCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
+static void (*temperatureListeners[10])(unsigned char, unsigned short, unsigned short);
 
 volatile char canEventListener_error = 1;
 
@@ -86,9 +87,10 @@ static void decodeFrame(struct can_frame *frame) {
 		// min current frame
 		decodeBatteryCellShort(frame, minCurrentListeners);
 		break;
-//	case 0x3f3:
-//		console_decode3f3(&frame, config);
-//		break;
+	case 0x3f3:
+		// temperature frame
+		decodeBatteryCellShort(frame, temperatureListeners);
+		break;
 //	case 0x3f4:
 //		console_decode3f4(&frame, config);
 //		break;
@@ -181,4 +183,8 @@ void canEventListener_registerShuntCurrentListener(void (*shuntCurrentListener)(
 
 void canEventListener_registerMinCurrentListener(void (*minCurrentListener)(unsigned char, unsigned short, unsigned short)) {
 	registerListener(minCurrentListener, minCurrentListeners);
+}
+
+void canEventListener_registerTemperatureListener(void (*temperatureListener)(unsigned char, unsigned short, unsigned short)) {
+	registerListener(temperatureListener, temperatureListeners);
 }
