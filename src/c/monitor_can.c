@@ -49,6 +49,33 @@ char monitorCan_send(struct can_frame *frame);
 
 /* CAN BUS socket */
 int s;
+static unsigned char error = 1;
+
+static int getSocket() {
+	if (error) {
+		fprintf(stderr, "resetting can bus");
+		system("./slcan.py");
+		sleep(1);
+		s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+		if (s == -1) {
+			return -1;
+		}
+
+		struct ifreq ifr;
+		strcpy(ifr.ifr_name, "slcan0");
+		ioctl(s, SIOCGIFINDEX, &ifr);
+
+		struct sockaddr_can addr;
+		addr.can_family = AF_CAN;
+		addr.can_ifindex = ifr.ifr_ifindex;
+
+		error = bind(s, (struct sockaddr *) &addr, sizeof(addr));
+		if (error) {
+			return -1;
+		}
+	}
+	return s;
+}
 
 void monitorCan_sendChar2ShortsChar(const short frameId, const char c, const short s1, const short s2, const char c2) {
 	struct can_frame frame;
@@ -86,19 +113,8 @@ void monitorCan_send3Char(const short frameId, const char c1, const char c2, con
 
 /* Initialisation function, return 0 if successful */
 int monitorCan_init() {
-	s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-
-	struct ifreq ifr;
-	strcpy(ifr.ifr_name, "slcan0");
-	ioctl(s, SIOCGIFINDEX, &ifr);
-
-	struct sockaddr_can addr;
-	addr.can_family = AF_CAN;
-	addr.can_ifindex = ifr.ifr_ifindex;
-
-	bind(s, (struct sockaddr *) &addr, sizeof(addr));
-
-	return 0;
+	getSocket();
+	return error;
 }
 
 void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short cellIndex, const short vCell) {
@@ -173,10 +189,17 @@ void monitorCan_send2Shorts(const short frameId, const short s1, const short s2)
 char monitorCan_send(struct can_frame *frame) {
 //	fprintf(stderr, "\n");
 //	fprint_long_canframe(stderr, frame, "\n", 0);
+	int s = getSocket();
+	if (error) {
+		fprintf(stdout, "error getting socket");
+		fprintf(stderr, "error getting socket");
+		return 1;
+	}
 	int nbytes = write(s, frame, sizeof(struct can_frame));
 	if (nbytes != sizeof(struct can_frame)) {
 		printf("error writing can frame %d", nbytes);
 		fprintf(stderr, "error writing can frame %d", nbytes);
+		error = 1;
 		return 1;
 	}
 	return 0;
