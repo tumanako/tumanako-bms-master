@@ -207,21 +207,25 @@ static void cellConfigListener(unsigned char batteryIndex, unsigned short cellIn
 }
 
 void errorListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short errorCount) {
+	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3d ", cellIndex);
 	fflush(stdout);
 	moveToCell(config, batteryIndex, cellIndex, 46);
 	fprintf(stdout, "%4d", errorCount);
 	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
 }
 
 void latencyListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char latency) {
+	pthread_mutex_lock(&mutex);
 	moveToCell(config, batteryIndex, cellIndex, 0);
 	fprintf(stdout, "%3hu ", cellIndex);
 	fflush(stdout);
 	moveToCell(config, batteryIndex, cellIndex, 51);
 	fprintf(stdout, "%2hhu", latency);
 	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
 }
 
 /* Decode a charger state frame. */
