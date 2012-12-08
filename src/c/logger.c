@@ -26,21 +26,11 @@
 #include <libgen.h>
 #include <time.h>
 
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <sys/uio.h>
-#include <net/if.h>
-
-#include <linux/can.h>
-#include <linux/if.h>
-#include <linux/can/raw.h>
-
 #include <pthread.h>
 
 #include "soc.h"
 #include "util.h"
+#include "canEventListener.h"
 #include "logger.h"
 
 struct logger_battery_t {
@@ -58,16 +48,16 @@ struct logger_status_t {
 	unsigned short temperature;
 };
 
-extern int readFrame(int s, struct can_frame *frame);
-void logger_decode3f0(struct can_frame *frame);
-void logger_decode3f1(struct can_frame *frame);
-void logger_decode3f3(struct can_frame *frame);
+static void voltageListener(unsigned char batteryId, unsigned short cellIndex, unsigned short voltage);
+static void shuntCurrentListener(unsigned char batteryId, unsigned short cellIndex, unsigned short shuntCurrent);
+static void temperatureListener(unsigned char batteryId, unsigned short cellIndex, unsigned short temperature);
 void *logger_backgroundThread(void *ptr);
 void logger_writeLogLine(unsigned char i);
 void logMilli(FILE *out, unsigned short value, char isValid);
 int countCellsWithData(struct logger_status_t cells[], short cellCount);
 
 static pthread_t thread;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct config_t *config;
 static struct logger_battery_t *loggerBatteries;
 
@@ -104,6 +94,9 @@ unsigned char logger_init(struct config_t *_config) {
 		fflush(loggerBattery->out);
 	}
 	pthread_create(&thread, NULL, logger_backgroundThread, (void *) "unused");
+	canEventListener_registerVoltageListener(voltageListener);
+	canEventListener_registerShuntCurrentListener(shuntCurrentListener);
+	canEventListener_registerTemperatureListener(temperatureListener);
 	return 0;
 error:
 	// todo cleanup
@@ -111,38 +104,8 @@ error:
 }
 
 void *logger_backgroundThread(void *unused __attribute__ ((unused))) {
-	struct can_frame frame;
-
-	int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-
-	struct ifreq ifr;
-	strcpy(ifr.ifr_name, "slcan0");
-	ioctl(s, SIOCGIFINDEX, &ifr);
-
-	struct sockaddr_can addr;
-	addr.can_family = AF_CAN;
-	addr.can_ifindex = ifr.ifr_ifindex;
-
-	bind(s, (struct sockaddr *) &addr, sizeof(addr));
-
 	while (1) {
-		fd_set rfds;
-		struct timeval tv;
-		FD_ZERO(&rfds);
-		FD_SET(s, &rfds);
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
-		if (select(s + 1, &rfds, NULL, NULL, &tv) > 0) {
-			if (!readFrame(s, &frame)) {
-				if (frame.can_id == 0x3f0) {
-					logger_decode3f0(&frame);
-				} else if (frame.can_id == 0x3f1) {
-					logger_decode3f1(&frame);
-				} else if (frame.can_id == 0x3f3) {
-					logger_decode3f3(&frame);
-				}
-			}
-		}
+		sleep(1);
 		for (unsigned char i = 0; i < config->batteryCount; i++) {
 			logger_writeLogLine(i);
 		}
@@ -158,12 +121,14 @@ void *logger_backgroundThread(void *unused __attribute__ ((unused))) {
  * the timeout has expired and we log a line with incomplete data)
  */
 void logger_writeLogLine(unsigned char i) {
+	pthread_mutex_lock(&mutex);
 	struct logger_battery_t *loggerBattery = loggerBatteries + i;
 	struct config_battery_t *configBattery = config->batteries + i;
 	time_t now;
 	time(&now);
 	if (now - loggerBattery->whenLastLogged < 1) {
 		// we wrote a line recently, wait some more
+		pthread_mutex_unlock(&mutex);
 		return;
 	}
 	int thisCount = countCellsWithData(loggerBattery->cells, configBattery->cellCount);
@@ -172,6 +137,7 @@ void logger_writeLogLine(unsigned char i) {
 		if (thisCount == 0) {
 			// we haven't had any data, make sure we don't log anything until we do
 			loggerBattery->whenLastLogged = now;
+			pthread_mutex_unlock(&mutex);
 			return;
 		}
 		// todo, this is too long during motoring, but expected during charging with
@@ -179,6 +145,7 @@ void logger_writeLogLine(unsigned char i) {
 		// motoring or make the transistor shunts faster
 		if (now - loggerBattery->whenLastLogged < 120) {
 			// we had complete data less than 2 minutes ago, wait some more
+			pthread_mutex_unlock(&mutex);
 			return;
 		}
 	}
@@ -193,6 +160,7 @@ void logger_writeLogLine(unsigned char i) {
 	fprintf(loggerBattery->out, "\n");
 	fflush(loggerBattery->out);
 	loggerBattery->whenLastLogged = now;
+	pthread_mutex_unlock(&mutex);
 }
 
 int countCellsWithData(struct logger_status_t cells[], short cellCount) {
@@ -204,6 +172,7 @@ int countCellsWithData(struct logger_status_t cells[], short cellCount) {
 	}
 	return result;
 }
+
 void logMilli(FILE *out, unsigned short value, char isValid) {
 	if (isValid) {
 		fprintf(out, " %.3f", milliToDouble(value));
@@ -212,51 +181,27 @@ void logMilli(FILE *out, unsigned short value, char isValid) {
 	}
 }
 
-/* Decode a voltage frame. */
-void logger_decode3f0(struct can_frame *frame) {
-	unsigned char batteryId = bufToChar(frame->data);
-	if (batteryId > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryId;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+static void voltageListener(unsigned char batteryId, unsigned short cellIndex, unsigned short voltage) {
+	fprintf(stderr, "v %d %d %d\n", batteryId, cellIndex, voltage);
 	struct logger_status_t *cells = (loggerBatteries + batteryId)->cells;
-	cells[cellIndex].voltage = bufToShort(frame->data + 3);
+	cells[cellIndex].voltage = voltage;
 	cells[cellIndex].valued |= 0x01;
+	logger_writeLogLine(batteryId);
 }
 
-/* Decode a shunt current frame. */
-void logger_decode3f1(struct can_frame *frame) {
-	unsigned char batteryId = bufToChar(frame->data);
-	if (batteryId > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryId;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+static void shuntCurrentListener(unsigned char batteryId, unsigned short cellIndex, unsigned short shuntCurrent) {
+	fprintf(stderr, "s %d %d %d\n", batteryId, cellIndex, shuntCurrent);
 	struct logger_status_t *cells = (loggerBatteries + batteryId)->cells;
-	cells[cellIndex].shuntCurrent = bufToShort(frame->data + 3);
+	cells[cellIndex].shuntCurrent = shuntCurrent;
 	cells[cellIndex].valued |= 0x02;
+	logger_writeLogLine(batteryId);
 }
 
-/* Decode a temperature frame. */
-void logger_decode3f3(struct can_frame *frame) {
-	unsigned char batteryId = bufToChar(frame->data);
-	if (batteryId > config->batteryCount) {
-		return;
-	}
-	struct config_battery_t *battery = config->batteries + batteryId;
-	unsigned short cellIndex = bufToShort(frame->data + 1);
-	if (cellIndex > battery->cellCount) {
-		return;
-	}
+static void temperatureListener(unsigned char batteryId, unsigned short cellIndex, unsigned short temperature) {
+	fprintf(stderr, "t %d %d %d\n", batteryId, cellIndex, temperature);
 	struct logger_status_t *cells = (loggerBatteries + batteryId)->cells;
-	cells[cellIndex].temperature = bufToShort(frame->data + 3);
+	cells[cellIndex].temperature = temperature;
 	cells[cellIndex].valued |= 0x04;
+	logger_writeLogLine(batteryId);
 }
 
