@@ -13,7 +13,7 @@ CHARGER_CONTROL_LDFLAGS=-lusb-1.0 $(LIB_LABJACK_USB)/liblabjackusb/labjackusb.o
 #CHARGER_CONTROL_CFLAGS=
 #CHARGER_CONTROL_LDFLAGS=
 #CHARGER_CONTROL_LIBS=
-MONITOR_SRC=monitor.c crc.c soc_evision.c monitor_can.c logger.c util.c config.c console.c canEventListener.c $(CHARGER_CONTROL_SRC)
+MONITOR_SRC=monitor.c crc.c soc_evision.c monitor_can.c logger.c util.c config.c console.c canEventListener.c chargeAlgorithm.c $(CHARGER_CONTROL_SRC)
 MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 
 SRCS=$(wildcard *.c)

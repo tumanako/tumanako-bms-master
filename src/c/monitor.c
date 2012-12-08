@@ -38,6 +38,8 @@
 #include "config.h"
 #include "crc.h"
 #include "chargercontrol.h"
+#include "chargeAlgorithm.h"
+#include "canEventListener.h"
 #include "buscontrol.h"
 #include "soc.h"
 #include "monitor_can.h"
@@ -54,9 +56,6 @@
 #define DEBUG 0
 #define HAS_KELVIN_CONNECTION 0
 #define CHARGER_RELAY_PORT 7
-#define CHARGER_ON_VOLTAGE 3450
-#define CHARGER_OFF_VOLTAGE 3650
-#define END_OF_CHARGE_VOLTAGE 3500
 #define SHUNT_MAX_CURRENT 150
 #define CHARGE_CURRENT_OVERSAMPLING 5
 
@@ -172,28 +171,6 @@ char _getCellSummary(struct status_t *status, int maxAttempts) {
 	return 1;
 }
 
-/**
- * Currently we control the charger in only one of our batteries, this hack will go away
- * when we can express this in the configuration file
- */
-unsigned short minVoltageInTheChargingBattery() {
-	if (data.batteryCount != 3) {
-		return 0xffff;
-	}
-	return minVoltage(&data.batteries[2]);
-}
-
-/**
- * Currently we control the charger in only one of our batteries, this hack will go away
- * when we can express this in the configuration file
- */
-unsigned short maxVoltageInTheChargingBattery() {
-	if (data.batteryCount != 3) {
-		return 0;
-	}
-	return maxVoltage(&data.batteries[2]);
-}
-
 char getCellSummary(struct status_t *cell) {
 	// if we didn't get the cell version at startup, try again
 	if (cell->version == (char) -1) {
@@ -277,6 +254,7 @@ int main() {
 	}
 
 	console_init(config);
+	chargeAlgorithm_init(config);
 
 	buscontrol_setBus(TRUE);
 	fd = open(config->serialPort, O_RDWR | O_NOCTTY);
@@ -327,9 +305,6 @@ int main() {
 	sleep(1);
 
 	time_t last = 0;
-	char shutdown = 0;
-	char chargerState = 0;
-	char chargerStateChangeReason = 0;
 	for (int count = 0; TRUE; count++) {
 		time_t t;
 		time(&t);
@@ -368,51 +343,6 @@ int main() {
 			sleep(2);
 			// read the current
 			getCellStates();
-		}
-
-		// do charger control stuff
-		if (shutdown) {
-			// charging is finished or we had an error
-			chargercontrol_setCharger(FALSE);
-		} else if (chargerState == 1) {
-			chargercontrol_setCharger(TRUE);
-			// charger is on, find a reason to turn it off
-			if (maxVoltageInTheChargingBattery() > CHARGER_OFF_VOLTAGE) {
-				// over voltage, turn off the charger
-				chargercontrol_setCharger(FALSE);
-				chargerState = 0;
-				chargerStateChangeReason = 1;
-			} else if (minVoltageInTheChargingBattery() > END_OF_CHARGE_VOLTAGE && soc_getCurrent() > -4) {
-				// charging is finished
-				chargercontrol_setCharger(FALSE);
-				chargerState = 0;
-				chargerStateChangeReason = 2;
-				shutdown = TRUE;
-			} else if (soc_getCurrent() > -3) {
-				// charging current is too low
-				chargercontrol_setCharger(FALSE);
-				chargerState = 0;
-				chargerStateChangeReason = 3;
-			}
-		} else {
-			chargercontrol_setCharger(FALSE);
-			// charger is off, find a reason to turn it on
-			if (maxVoltageInTheChargingBattery() < CHARGER_ON_VOLTAGE) {
-				// battery voltage is low, charger should switch on
-				chargercontrol_setCharger(TRUE);
-				chargerState = 1;
-				chargerStateChangeReason = 4;
-				// give the charger time to stabilize
-				sleep(10);
-			}
-		}
-		monitorCan_sendChargerState(shutdown, chargerState, chargerStateChangeReason);
-
-		// do error checking stuff
-		if (soc_getError()) {
-			fprintf(stderr, "State of Charge error?");
-			chargercontrol_shutdown();
-			shutdown = TRUE;
 		}
 	}
 	tcsetattr(fd, TCSANOW, &oldtio);
