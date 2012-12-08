@@ -51,7 +51,7 @@ void decode705(struct can_frame *frame);
 void printFrame(struct can_frame *frame);
 unsigned short makeShort(__u8 *c);
 unsigned long make24BitLong(__u8 *c);
-void *backgroundThread(void *ptr);
+static void *backgroundThread(void *ptr);
 
 volatile unsigned short volts = 0;
 volatile long chargeCurrent = 0;
@@ -92,7 +92,7 @@ char soc_getError() {
 	return error;
 }
 
-void *backgroundThread(void *unused __attribute__ ((unused))) {
+static void *backgroundThread(void *unused __attribute__ ((unused))) {
 	struct can_frame frame;
 
 	int s = socket(PF_CAN, SOCK_RAW, CAN_RAW);
