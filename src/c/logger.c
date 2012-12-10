@@ -48,7 +48,7 @@ struct logger_status_t {
 	unsigned short temperature;
 };
 
-static void voltageListener(unsigned char batteryId, unsigned short cellIndex, unsigned short voltage);
+static void voltageListener(unsigned char batteryId, unsigned short cellIndex, unsigned char isValid, unsigned short voltage);
 static void shuntCurrentListener(unsigned char batteryId, unsigned short cellIndex, unsigned short shuntCurrent);
 static void temperatureListener(unsigned char batteryId, unsigned short cellIndex, unsigned short temperature);
 void *logger_backgroundThread(void *ptr);
@@ -181,8 +181,11 @@ void logMilli(FILE *out, unsigned short value, char isValid) {
 	}
 }
 
-static void voltageListener(unsigned char batteryId, unsigned short cellIndex, unsigned short voltage) {
-	fprintf(stderr, "v %d %d %d\n", batteryId, cellIndex, voltage);
+static void voltageListener(unsigned char batteryId, unsigned short cellIndex, unsigned char isValid, unsigned short voltage) {
+	fprintf(stderr, "v %d %d %d %d\n", batteryId, cellIndex, isValid, voltage);
+	if (!isValid) {
+		return;
+	}
 	struct logger_status_t *cells = (loggerBatteries + batteryId)->cells;
 	cells[cellIndex].voltage = voltage;
 	cells[cellIndex].valued |= 0x01;

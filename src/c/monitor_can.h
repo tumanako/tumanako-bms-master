@@ -25,7 +25,7 @@
 
 int monitorCan_init();
 
-void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short cellIndex, const short vCell);
+void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short cellIndex, const unsigned char isValid, const short vCell);
 void monitorCan_sendShuntCurrent(const unsigned char batteryIndex, const short cellIndex, const short iShunt);
 void monitorCan_sendMinCurrent(const unsigned char batteryIndex, const short cellIndex, const short minCurrent);
 void monitorCan_sendTemperature(const unsigned char batteryIndex, const short cellIndex, const short temperature);

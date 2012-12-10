@@ -108,8 +108,8 @@ static void doChargerControl() {
 	monitorCan_sendChargerState(chargerShutdown, chargerState, chargerStateChangeReason);
 }
 
-static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short voltage) {
-	fprintf(stderr, "charger voltageLisenter %d\n", batteryIndex);
+static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char isValid, unsigned short voltage) {
+	fprintf(stderr, "charger voltageLisenter %d %d %d %d\n", batteryIndex, cellIndex, isValid, voltage);
 	// we only control the charger in battery 2
 	if (batteryIndex != 2) {
 		return;

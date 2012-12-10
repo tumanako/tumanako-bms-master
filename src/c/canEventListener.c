@@ -49,7 +49,7 @@
 static pthread_t thread;
 static struct config_t *config;
 
-static void (*voltageListeners[10])(unsigned char, unsigned short, unsigned short);
+static void (*voltageListeners[10])(unsigned char, unsigned short, unsigned char, unsigned short);
 static void (*shuntCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*minCurrentListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*temperatureListeners[10])(unsigned char, unsigned short, unsigned short);
@@ -60,6 +60,25 @@ static void (*chargerStateListeners[10])(unsigned char, unsigned char, unsigned 
 static void (*rawCanListeners[10])(struct can_frame *frame);
 
 volatile char canEventListener_error = 1;
+
+static void decodeVoltage(struct can_frame *frame) {
+	unsigned char batteryIndex = bufToChar(frame->data);
+	if (batteryIndex > config->batteryCount) {
+		return;
+	}
+	struct config_battery_t *battery = config->batteries + batteryIndex;
+	unsigned short cellIndex = bufToShort(frame->data + 1);
+	if (cellIndex > battery->cellCount) {
+		return;
+	}
+	unsigned char isValid = bufToChar(frame->data + 3);
+	unsigned short voltage = bufToShort(frame->data + 4);
+
+
+	for (int i = 0; voltageListeners[i]; i++) {
+		voltageListeners[i](batteryIndex, cellIndex, isValid, voltage);
+	}
+}
 
 static void decodeBatteryCellShort(struct can_frame *frame, void (*listeners[])(unsigned char, unsigned short, unsigned short)) {
 	unsigned char batteryIndex = bufToChar(frame->data);
@@ -126,8 +145,7 @@ static void decodeChargerState(struct can_frame *frame) {
 static void decodeFrame(struct can_frame *frame) {
 	switch (frame->can_id) {
 	case 0x3f0:
-		// voltage frame
-		decodeBatteryCellShort(frame, voltageListeners);
+		decodeVoltage(frame);
 		break;
 	case 0x3f1:
 		// shunt current frame
@@ -223,8 +241,12 @@ void registerListener(void (*listener)(unsigned char, unsigned short, unsigned s
 	listeners[i] = listener;
 }
 
-void canEventListener_registerVoltageListener(void (*voltageListener)(unsigned char, unsigned short, unsigned short)) {
-	registerListener(voltageListener, voltageListeners);
+void canEventListener_registerVoltageListener(void (*voltageListener)(unsigned char, unsigned short, unsigned char, unsigned short)) {
+	int i = 0;
+	while (voltageListeners[i] != NULL) {
+		i++;
+	}
+	voltageListeners[i] = voltageListener;
 }
 
 void canEventListener_registerShuntCurrentListener(void (*shuntCurrentListener)(unsigned char, unsigned short, unsigned short)) {

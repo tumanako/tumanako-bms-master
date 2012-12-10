@@ -27,7 +27,7 @@
 #include "config.h"
 
 extern void canEventListener_init(struct config_t *_config);
-extern void canEventListener_registerVoltageListener(void (*voltageListener)(unsigned char, unsigned short, unsigned short));
+extern void canEventListener_registerVoltageListener(void (*voltageListener)(unsigned char, unsigned short, unsigned char, unsigned short));
 extern void canEventListener_registerShuntCurrentListener(void (*shuntCurrentListener)(unsigned char, unsigned short, unsigned short));
 extern void canEventListener_registerMinCurrentListener(void (*minCurrentListener)(unsigned char, unsigned short, unsigned short));
 extern void canEventListener_registerTemperatureListener(void (*temperatureListener)(unsigned char, unsigned short, unsigned short));

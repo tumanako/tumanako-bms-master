@@ -360,10 +360,7 @@ void getCellStates() {
 			if (!success) {
 				continue;
 			}
-			if (!isCellShunting(cell)) {
-				// the voltage doesn't mean much when we are drawing current
-				montiorCan_sendCellVoltage(i, j, cell->vCell);
-			}
+			montiorCan_sendCellVoltage(i, j, !isCellShunting(cell), cell->vCell);
 			if (!shuntPause) {
 				monitorCan_sendShuntCurrent(i, j, cell->iShunt);
 				monitorCan_sendMinCurrent(i, j, cell->minCurrent);

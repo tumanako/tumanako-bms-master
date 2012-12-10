@@ -73,7 +73,10 @@ void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned sh
 	moveCursor(x + offset, batteryOffset + cellIndex / 2);
 }
 
-static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short voltage) {
+static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char isValid, unsigned short voltage) {
+	if (!isValid) {
+		return;
+	}
 	pthread_mutex_lock(&mutex);
 	struct config_battery_t *battery = config->batteries + batteryIndex;
 	moveToCell(config, batteryIndex, cellIndex, 0);

@@ -100,11 +100,23 @@ void monitorCan_sendCharShortChar(const short frameId, const char c, const short
 	monitorCan_send(&frame);
 }
 
+void monitorCan_sendCharShortCharShort(const short frameId, const char c, const short s1, const char c2, const short s2) {
+	struct can_frame frame;
+	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */
+	frame.can_id = frameId;
+	frame.can_dlc = 6;
+	charToBuf(c, frame.data);
+	shortToBuf(s1, frame.data + 1);
+	charToBuf(c2, frame.data + 3);
+	shortToBuf(s2, frame.data + 4);
+	monitorCan_send(&frame);
+}
+
 void monitorCan_send3Char(const short frameId, const char c1, const char c2, const char c3) {
 	struct can_frame frame;
 	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */
 	frame.can_id = frameId;
-	frame.can_dlc = 1;
+	frame.can_dlc = 3;
 	charToBuf(c1, frame.data);
 	charToBuf(c2, frame.data + 1);
 	charToBuf(c3, frame.data + 2);
@@ -117,8 +129,8 @@ int monitorCan_init() {
 	return error;
 }
 
-void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short cellIndex, const short vCell) {
-	monitorCan_sendChar2Shorts(0x3f0, batteryIndex, cellIndex, vCell);
+void montiorCan_sendCellVoltage(const unsigned char batteryIndex, const short cellIndex, const unsigned char isValid, const short vCell) {
+	monitorCan_sendCharShortCharShort(0x3f0, batteryIndex, cellIndex, isValid, vCell);
 }
 
 void monitorCan_sendShuntCurrent(const unsigned char batteryIndex, const short cellIndex, const short iShunt) {
