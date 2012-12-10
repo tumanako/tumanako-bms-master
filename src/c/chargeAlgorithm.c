@@ -41,7 +41,8 @@ static time_t whenChargerOn = 0;
 static char chargerShutdown = 0;
 static char chargerState = 0;
 static char chargerStateChangeReason = 0;
-static unsigned short count;
+static unsigned short validCount;
+static unsigned short invalidCount;
 static char errorLastTime = 0;
 
 static void doChargerControl() {
@@ -51,9 +52,9 @@ static void doChargerControl() {
 		chargerShutdown = TRUE;
 		chargerStateChangeReason = 5;
 	}
-	if (count != config->batteries[2].cellCount) {
+	if (validCount + invalidCount != config->batteries[2].cellCount) {
+		fprintf(stderr, "got %d + %d = %d expected %d\n", validCount, invalidCount, validCount + invalidCount, config->batteries[2].cellCount);
 		if (errorLastTime) {
-			fprintf(stderr, "State of Charge error?");
 			chargerShutdown = TRUE;
 			chargerStateChangeReason = 6;
 		} else {
@@ -96,12 +97,17 @@ static void doChargerControl() {
 	} else {
 		chargercontrol_setCharger(FALSE);
 		// charger is off, find a reason to turn it on
-		if (maxVoltage < CHARGER_ON_VOLTAGE) {
-			// battery voltage is low, charger should switch on
-			chargercontrol_setCharger(TRUE);
-			chargerState = 1;
-			chargerStateChangeReason = 4;
-			time(&whenChargerOn);
+		if (invalidCount != 0) {
+			// we didn't get voltages for every cell, can't use this pass to turn on the charger
+			chargerStateChangeReason = 7;
+		} else {
+			if (maxVoltage < CHARGER_ON_VOLTAGE) {
+				// battery voltage is low, charger should switch on
+				chargercontrol_setCharger(TRUE);
+				chargerState = 1;
+				chargerStateChangeReason = 4;
+				time(&whenChargerOn);
+			}
 		}
 	}
 	fprintf(stderr, "chargerState %d %d %d\n", chargerShutdown, chargerState, chargerStateChangeReason);
@@ -114,19 +120,25 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 	if (batteryIndex != 2) {
 		return;
 	}
+	if (isValid) {
+		validCount++;
+	} else {
+		invalidCount++;
+		return;
+	}
 	if (voltage > maxVoltage) {
 		maxVoltage = voltage;
 	}
 	if (voltage < minVoltage) {
 		minVoltage = voltage;
 	}
-	count++;
 	if (cellIndex == config->batteries[2].cellCount - 1) {
 		fprintf(stderr, "doing charge control %d %d\n", minVoltage, maxVoltage);
 		doChargerControl();
 		maxVoltage = 0;
 		minVoltage = 0xffff;
-		count = 0;
+		validCount = 0;
+		invalidCount = 0;
 	}
 }
 
