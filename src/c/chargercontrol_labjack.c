@@ -63,6 +63,7 @@ int chargercontrol_init() {
 }
 
 void chargercontrol_shutdown() {
+	fprintf(stderr, "shutdown\n");
 	chargercontrol_setCharger(0);
 	buscontrol_setBus(0);
 }
@@ -73,6 +74,7 @@ int buscontrol_init() {
 }
 
 void chargercontrol_setCharger(char on) {
+	fprintf(stderr, "setCharger\n");
 	if (on) {
 		eDO(hDevice, 1, CHARGER_RELAY_PORT, 1);
 	} else {
@@ -81,6 +83,7 @@ void chargercontrol_setCharger(char on) {
 }
 
 void buscontrol_setBus(char on) {
+	fprintf(stderr, "setBus\n");
 	if (on) {
 		eDO(hDevice, 1, BUS_RELAY_PORT, 1);
 	} else {
@@ -91,7 +94,7 @@ void buscontrol_setBus(char on) {
 }
 
 int setWatchdog(HANDLE hDevice, char reset) {
-
+	fprintf(stderr, "setWatchdog\n");
 	uint8 sendBuff[26];
 	uint8 recBuff[38];
 	uint16 checksumTotal;
@@ -167,6 +170,7 @@ int setWatchdog(HANDLE hDevice, char reset) {
 }
 
 double getReading(int channel) {
+	fprintf(stderr, "getReading\n");
 	double value = 0;
 	for (int j = 0; j < CHARGE_CURRENT_OVERSAMPLING; j++) {
 		double singleValue;
@@ -178,6 +182,7 @@ double getReading(int channel) {
 }
 
 double chargercontrol_getChargeCurrent() {
+	fprintf(stderr, "getChargeCurrent\n");
 	double value = getReading(CHARGE_CURRENT_CHANNEL);
 	double result = (chargeCurrentZero - value) / 0.020 * (3 / 2.7);
 	//fprintf(stderr, "%lf %lf %lf\n", result, value, chargeCurrentZero);
