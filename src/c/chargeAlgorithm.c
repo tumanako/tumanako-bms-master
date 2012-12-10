@@ -59,6 +59,8 @@ static void doChargerControl() {
 		} else {
 			errorLastTime = TRUE;
 		}
+	} else {
+		errorLastTime = FALSE;
 	}
 
 	// do charger control stuff
