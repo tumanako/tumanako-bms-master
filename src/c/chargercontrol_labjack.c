@@ -174,8 +174,10 @@ double getReading(int channel) {
 	double value = 0;
 	for (int j = 0; j < CHARGE_CURRENT_OVERSAMPLING; j++) {
 		double singleValue;
-		if ((eAIN(hDevice, &caliInfo, 1, &DAC1Enable, channel, 31, &singleValue, 0, 0, 0, 0, 0, 0)) != 0)
+		if ((eAIN(hDevice, &caliInfo, 1, &DAC1Enable, channel, 31, &singleValue, 0, 0, 0, 0, 0, 0)) != 0) {
+			fprintf(stderr, "error getting reading");
 			exit(1);
+		}
 		value += singleValue;
 	}
 	return value / CHARGE_CURRENT_OVERSAMPLING;
