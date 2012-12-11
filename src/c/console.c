@@ -56,10 +56,13 @@ void moveCursor(unsigned char x, unsigned char y) {
 
 void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned short cellIndex, unsigned char offset) {
 	unsigned char x;
-	if (cellIndex % 2) {
+	unsigned char y;
+	if (cellIndex >= config->batteries[batteryIndex].cellCount / 2) {
 		x = 88;
+		y = cellIndex - config->batteries[batteryIndex].cellCount / 2;
 	} else {
 		x = 1;
+		y = cellIndex;
 	}
 	unsigned char batteryOffset = 1;
 	for (int i = 0; i < batteryIndex; i++) {
@@ -70,7 +73,20 @@ void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned sh
 		}
 		batteryOffset += lines + 1;
 	}
-	moveCursor(x + offset, batteryOffset + cellIndex / 2);
+	moveCursor(x + offset, batteryOffset + y);
+}
+
+void moveToSummary(struct config_t *config, unsigned char batteryIndex, unsigned char xOffset) {
+	unsigned char batteryOffset = 0;
+	for (int i = 0; i < batteryIndex + 1; i++) {
+		unsigned short cellCount = config->batteries[i].cellCount;
+		unsigned char lines = cellCount / 2;
+		if (cellCount % 2) {
+			lines++;
+		}
+		batteryOffset += lines + 1;
+	}
+	moveCursor(xOffset, batteryOffset);
 }
 
 static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char isValid, unsigned short voltage) {
@@ -97,7 +113,7 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 	totalVoltage += voltage;
 	if (cellIndex == config->batteries[batteryIndex].cellCount - 1) {
 		if (totalVoltageCount == battery->cellCount) {
-			moveToCell(config, batteryIndex, battery->cellCount, 0);
+			moveToSummary(config, batteryIndex, 0);
 			printf("%20s %.3f@%02d %.3f %.3f@%02d %7.3fV", battery->name,
 					asDouble(minVoltage), minVoltageCell, asDouble(totalVoltage / battery->cellCount),
 					asDouble(maxVoltage), maxVoltageCell, asDouble(totalVoltage));
@@ -219,7 +235,7 @@ static void latencyListener(unsigned char batteryIndex, unsigned short cellIndex
 
 static void chargerStateListener(unsigned char shutdown, unsigned char state, unsigned char reason) {
 	pthread_mutex_lock(&mutex);
-	moveToCell(config, config->batteryCount - 1, config->batteries[config->batteryCount - 1].cellCount + 1, 0);
+	moveToSummary(config, 2, 90);
 	fprintf(stdout, "%x %x %x", shutdown, state, reason);
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
@@ -227,8 +243,7 @@ static void chargerStateListener(unsigned char shutdown, unsigned char state, un
 
 static void console_printSoc() {
 	pthread_mutex_lock(&mutex);
-	struct config_battery_t *battery = config->batteries + 2;
-	moveToCell(config, 2, battery->cellCount, 54);
+	moveToSummary(config, 2, 55);
 	printf("%6.2fV %7.2fA %7.2fAh", soc_getVoltage(), soc_getCurrent(), soc_getAh());
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
