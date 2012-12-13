@@ -512,26 +512,45 @@ unsigned char turnOffAllShunts() {
 	return changed;
 }
 
+unsigned short getMaxTemperature(struct battery_t *battery) {
+	unsigned short result = 0;
+	for (unsigned short i = 0; i < battery->cellCount; i++) {
+		struct status_t *cell = battery->cells + i;
+		if (cell->hasTemperatureSensor) {
+			if (cell->temperature > result) {
+				result = cell->temperature;
+			}
+		}
+	}
+	return result;
+}
+
 unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery) {
+	if (soc_getCurrent() < -3) {
+		return FALSE;
+	}
+	unsigned short maxTemperature = getMaxTemperature(battery);
+	unsigned short maxShuntCurrent;
+	if (maxTemperature < 3000) {
+		maxShuntCurrent = 450;
+	} else if (maxTemperature < 4000) {
+		maxShuntCurrent = 400;
+	} else if (maxTemperature < 5000) {
+		maxShuntCurrent = 300;
+	} else {
+		maxShuntCurrent = 150;
+	}
+	unsigned short min = minVoltage(battery);
 	unsigned char changed = FALSE;
 	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		struct status_t *cell = battery->cells + i;
 		unsigned short target;
-		if (cell->vCell > config->minVoltageSocRelevant) {
-			short difference = cell->vCell - minVoltage(battery);
-			if (difference < config->voltageDeadband) {
-				target = 0;
-			} else {
-				target = (difference / 5) * 50 + 50;
-			}
-			if (target > SHUNT_MAX_CURRENT) {
-				target = SHUNT_MAX_CURRENT;
-			} else if (target > 0 && target < 150) {
-				// the slaves don't respond to shunt demands less than 150 :(
-				target = 150;
-			}
-		} else {
+		if (cell->vCell < config->minVoltageSocRelevant) {
 			target = 0;
+		} else if (cell->vCell < min + config->voltageDeadband) {
+			target = 0;
+		} else {
+			target = maxShuntCurrent;
 		}
 		if (target < config->minShuntCurrent) {
 			target = config->minShuntCurrent;
