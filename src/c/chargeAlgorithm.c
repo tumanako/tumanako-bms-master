@@ -19,6 +19,8 @@
  */
 
 #include <stdio.h>
+#include <time.h>
+
 #include "soc.h"
 #include "canEventListener.h"
 #include "monitor_can.h"
@@ -38,6 +40,7 @@ static unsigned short minVoltage = 0xffff;
 static unsigned short maxVoltage = 0;
 
 static time_t whenChargerOn = 0;
+static time_t whenLastValid;
 static char chargerShutdown = 0;
 static char chargerState = 0;
 static char chargerStateChangeReason = 0;
@@ -52,7 +55,8 @@ static void doChargerControl() {
 		chargerShutdown = TRUE;
 		chargerStateChangeReason = 5;
 	}
-	if (validCount + invalidCount != config->batteries[2].cellCount) {
+	unsigned short expectedCount = config->batteries[2].cellCount;
+	if (validCount + invalidCount != expectedCount) {
 		fprintf(stderr, "got %d + %d = %d expected %d\n", validCount, invalidCount, validCount + invalidCount, config->batteries[2].cellCount);
 		if (errorLastTime) {
 			chargerShutdown = TRUE;
@@ -63,6 +67,15 @@ static void doChargerControl() {
 	} else {
 		errorLastTime = FALSE;
 	}
+	time_t now;
+	time(&now);
+	if (validCount == expectedCount) {
+		whenLastValid = now;
+	} else if (now - whenLastValid > 150) {
+		fprintf(stderr, "no valid data for %ld seconds", now - whenLastValid);
+		chargerShutdown = TRUE;
+		chargerStateChangeReason = 8;
+	}
 
 	// do charger control stuff
 	if (chargerShutdown) {
@@ -70,8 +83,8 @@ static void doChargerControl() {
 		chargercontrol_setCharger(FALSE);
 		chargerState = 0;
 	} else if (chargerState == 1) {
-		chargercontrol_setCharger(TRUE);
 		// charger is on, find a reason to turn it off
+		chargercontrol_setCharger(TRUE);
 		if (maxVoltage > CHARGER_OFF_VOLTAGE) {
 			// over voltage, turn off the charger
 			chargercontrol_setCharger(FALSE);
@@ -85,8 +98,6 @@ static void doChargerControl() {
 			chargerShutdown = TRUE;
 		} else if (soc_getCurrent() > -3) {
 			// charging current is too low
-			time_t now;
-			time(&now);
 			// did we just just turn it on?
 			if (now - whenChargerOn > 10) {
 				chargercontrol_setCharger(FALSE);
@@ -144,4 +155,5 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 void chargeAlgorithm_init(struct config_t *_config) {
 	config = _config;
 	canEventListener_registerVoltageListener(voltageListener);
+	time(&whenLastValid);
 }
