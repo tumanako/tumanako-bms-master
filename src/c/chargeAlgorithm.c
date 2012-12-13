@@ -77,7 +77,7 @@ static void doChargerControl() {
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
 			chargerStateChangeReason = 1;
-		} else if (minVoltage > END_OF_CHARGE_VOLTAGE && soc_getCurrent() > -4) {
+		} else if (invalidCount == 0 && minVoltage > END_OF_CHARGE_VOLTAGE && soc_getCurrent() > -4) {
 			// charging is finished
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
@@ -120,17 +120,16 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 	if (batteryIndex != 2) {
 		return;
 	}
-	if (isValid) {
-		validCount++;
-	} else {
+	if (!isValid) {
 		invalidCount++;
-		return;
-	}
-	if (voltage > maxVoltage) {
-		maxVoltage = voltage;
-	}
-	if (voltage < minVoltage) {
-		minVoltage = voltage;
+	} else {
+		validCount++;
+		if (voltage > maxVoltage) {
+			maxVoltage = voltage;
+		}
+		if (voltage < minVoltage) {
+			minVoltage = voltage;
+		}
 	}
 	if (cellIndex == config->batteries[2].cellCount - 1) {
 		fprintf(stderr, "doing charge control %d %d\n", minVoltage, maxVoltage);
