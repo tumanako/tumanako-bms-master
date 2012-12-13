@@ -154,6 +154,10 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 
 void chargeAlgorithm_init(struct config_t *_config) {
 	config = _config;
-	canEventListener_registerVoltageListener(voltageListener);
-	time(&whenLastValid);
+	if (config->loopDelay > 10) {
+		chargerShutdown = 1;
+	} else {
+		canEventListener_registerVoltageListener(voltageListener);
+		time(&whenLastValid);
+	}
 }
