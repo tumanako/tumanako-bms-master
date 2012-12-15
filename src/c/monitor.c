@@ -305,13 +305,15 @@ int main() {
 	sleep(1);
 
 	time_t last = 0;
-	for (int count = 0; TRUE; count++) {
+	int count = 0;
+	while (TRUE) {
 		time_t t;
 		time(&t);
 		if (t < last + config->loopDelay) {
 			sleep(1);
 			continue;
 		}
+		count++;
 		last = t;
 		if (config->loopDelay > 30) {
 			// if the slaves have gone to sleep, send some characters to wake them up
