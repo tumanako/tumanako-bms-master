@@ -86,7 +86,6 @@ unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery
 unsigned char setMinCurrent(struct status_t *cell, unsigned short minCurrent);
 void dumpBuffer(unsigned char *buf, int length);
 void findCells();
-void evd5ToStatus(struct evd5_status_t *from, struct status_t *to);
 double asDouble(int s);
 unsigned char turnOffAllShunts();
 char isAnyCellShunting();
@@ -824,9 +823,6 @@ void getSlaveVersions() {
 		for (unsigned short j = 0; j < battery->cellCount; j++) {
 			struct status_t *cell = battery->cells + j;
 			getCellVersion(cell);
-			char *resistorShunt = cell->isResistorShunt ? "resistorShunt" : "transistorShunt";
-			char *kelvinConnection = cell->isKelvinConnection ? "kelvin" : "noKelvin";
-			char *hardSwitchedShunt = cell->isHardSwitchedShunt ? "hardSwitched" : "adjustable";
 			monitorCan_sendHardware(i, j, cell->isKelvinConnection, cell->isResistorShunt, cell->isHardSwitchedShunt,
 					cell->revision, cell->isClean);
 		}
