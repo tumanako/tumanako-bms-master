@@ -32,8 +32,6 @@
 #include <unistd.h>
 #include <confuse.h>
 
-#include "../../../slave/src/c/evd5.h"
-
 #include "monitor.h"
 #include "config.h"
 #include "crc.h"
@@ -482,23 +480,6 @@ void decodeBinStatus(unsigned char *buf, struct status_t *to) {
 	to->hasRx = buf[15];
 	to->softwareAddressing = buf[16];
 	to->automatic = buf[17];
-}
-
-void evd5ToStatus(struct evd5_status_t* from, struct status_t* to) {
-	to->automatic = from->automatic;
-	to->gainPot = from->gainPot;
-	to->hasRx = from->hasRx;
-	to->iShunt = from->iShunt;
-	to->minCurrent = from->minCurrent;
-	to->sequenceNumber = from->sequenceNumber;
-	to->softwareAddressing = from->softwareAddressing;
-	to->temperature = from->temperature;
-	if (!isCellShunting(to)) {
-		to->vCell = from->vCell;
-	}
-	to->vShunt = from->vShunt;
-	to->vShuntPot = from->vShuntPot;
-	to->crc = from->crc;
 }
 
 /** turn shunting off on any cells that are shunting */
