@@ -113,14 +113,6 @@ static void decode705(struct can_frame *frame) {
 	aH = makeShort(frame->data + 1);
 }
 
-static void printFrame(struct can_frame *frame) {
-	printf("%x %d ", frame->can_id, frame->can_dlc);
-	for (int i = 0; i < frame->can_dlc; i++) {
-		printf("%02x", frame->data[i]);
-	}
-	printf("\n");
-}
-
 void rawCanListener(struct can_frame *frame) {
 	if (frame->can_id == 0x703) {
 		decode703(frame);
