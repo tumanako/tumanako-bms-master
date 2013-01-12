@@ -33,6 +33,7 @@
 #include "config.h"
 #include "canEventListener.h"
 #include "console.h"
+#include "chargeAlgorithm.h"
 
 static unsigned short maxVoltage = 0;
 static unsigned short maxVoltageCell;
@@ -236,7 +237,10 @@ static void latencyListener(unsigned char batteryIndex, unsigned short cellIndex
 static void chargerStateListener(unsigned char shutdown, unsigned char state, unsigned char reason) {
 	pthread_mutex_lock(&mutex);
 	moveToSummary(config, 2, 90);
-	fprintf(stdout, "%x %x %x", shutdown, state, reason);
+	const char *reasonString = chargeAlgorithm_getStateChangeReasonString(reason);
+	const char *shutdownString = shutdown ? "Shutdown" : "Running";
+	const char *stateString = state ? "On" : "Off";
+	fprintf(stdout, "%8s %3s %18s", shutdownString, stateString, reasonString);
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
 }

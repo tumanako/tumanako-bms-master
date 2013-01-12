@@ -18,3 +18,18 @@
  <http://www.gnu.org/licenses/>.
  */
 void chargeAlgorithm_init(struct config_t *_config);
+
+typedef enum {
+	UNDEFINED,
+	SOC_ERROR,
+	CONSECUTIVE_ERRORS,
+	DATA_TIMEOUT,
+	OVER_VOLTAGE,
+	END_OF_CHARGE,
+	CHARGE_CURRENT_TOO_LOW,
+	NEED_COMPLETE_DATA_FOR_RESTART,
+	LOW_VOLTAGE
+
+} chargerStateChangeReason_t;
+
+const char *chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason_t reason);

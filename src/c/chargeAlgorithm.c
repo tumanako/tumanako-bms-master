@@ -43,7 +43,7 @@ static time_t whenChargerOn = 0;
 static time_t whenLastValid;
 static char chargerShutdown = 0;
 static char chargerState = 0;
-static char chargerStateChangeReason = 0;
+static chargerStateChangeReason_t chargerStateChangeReason = UNDEFINED;
 static unsigned short validCount;
 static unsigned short invalidCount;
 static char errorLastTime = 0;
@@ -53,14 +53,14 @@ static void doChargerControl() {
 	if (soc_getError()) {
 		fprintf(stderr, "State of Charge error?");
 		chargerShutdown = TRUE;
-		chargerStateChangeReason = 5;
+		chargerStateChangeReason = SOC_ERROR;
 	}
 	unsigned short expectedCount = config->batteries[2].cellCount;
 	if (validCount + invalidCount != expectedCount) {
 		fprintf(stderr, "got %d + %d = %d expected %d\n", validCount, invalidCount, validCount + invalidCount, config->batteries[2].cellCount);
 		if (errorLastTime) {
 			chargerShutdown = TRUE;
-			chargerStateChangeReason = 6;
+			chargerStateChangeReason = CONSECUTIVE_ERRORS;
 		} else {
 			errorLastTime = TRUE;
 		}
@@ -74,7 +74,7 @@ static void doChargerControl() {
 	} else if (now - whenLastValid > 150) {
 		fprintf(stderr, "no valid data for %ld seconds", now - whenLastValid);
 		chargerShutdown = TRUE;
-		chargerStateChangeReason = 8;
+		chargerStateChangeReason = DATA_TIMEOUT;
 	}
 
 	// do charger control stuff
@@ -89,12 +89,12 @@ static void doChargerControl() {
 			// over voltage, turn off the charger
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
-			chargerStateChangeReason = 1;
+			chargerStateChangeReason = OVER_VOLTAGE;
 		} else if (invalidCount == 0 && minVoltage > END_OF_CHARGE_VOLTAGE && soc_getCurrent() > -4) {
 			// charging is finished
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
-			chargerStateChangeReason = 2;
+			chargerStateChangeReason = END_OF_CHARGE;
 			chargerShutdown = TRUE;
 		} else if (soc_getCurrent() > -3) {
 			// charging current is too low
@@ -102,7 +102,7 @@ static void doChargerControl() {
 			if (now - whenChargerOn > 10) {
 				chargercontrol_setCharger(FALSE);
 				chargerState = 0;
-				chargerStateChangeReason = 3;
+				chargerStateChangeReason = CHARGE_CURRENT_TOO_LOW;
 			}
 		}
 	} else {
@@ -110,13 +110,13 @@ static void doChargerControl() {
 		// charger is off, find a reason to turn it on
 		if (invalidCount != 0) {
 			// we didn't get voltages for every cell, can't use this pass to turn on the charger
-			chargerStateChangeReason = 7;
+			chargerStateChangeReason = NEED_COMPLETE_DATA_FOR_RESTART;
 		} else {
 			if (maxVoltage < CHARGER_ON_VOLTAGE) {
 				// battery voltage is low, charger should switch on
 				chargercontrol_setCharger(TRUE);
 				chargerState = 1;
-				chargerStateChangeReason = 4;
+				chargerStateChangeReason = LOW_VOLTAGE;
 				time(&whenChargerOn);
 			}
 		}
@@ -160,4 +160,28 @@ void chargeAlgorithm_init(struct config_t *_config) {
 		canEventListener_registerVoltageListener(voltageListener);
 		time(&whenLastValid);
 	}
+}
+
+const char *chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason_t reason) {
+	switch (reason) {
+	case UNDEFINED :
+		return "undefined";
+	case SOC_ERROR :
+		return "SOC error";
+	case CONSECUTIVE_ERRORS :
+		return "Consecutive Errors";
+	case DATA_TIMEOUT :
+		return "Data Timeout";
+	case OVER_VOLTAGE :
+		return "Over Voltage";
+	case END_OF_CHARGE :
+		return "End of Charge";
+	case CHARGE_CURRENT_TOO_LOW :
+		return "Current too low";
+	case NEED_COMPLETE_DATA_FOR_RESTART :
+		return "Incomplete Data";
+	case LOW_VOLTAGE :
+		return "Low Voltage";
+	}
+	return "unknown?";
 }
