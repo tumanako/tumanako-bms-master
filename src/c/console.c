@@ -34,6 +34,7 @@
 #include "canEventListener.h"
 #include "console.h"
 #include "chargeAlgorithm.h"
+#include "monitor.h"
 
 static unsigned short maxVoltage = 0;
 static unsigned short maxVoltageCell;
@@ -253,6 +254,15 @@ static void console_printSoc() {
 	pthread_mutex_unlock(&mutex);
 }
 
+static void monitorStateListener(monitor_state_t state, __u16 delay, __u8 loopsUntilVoltage) {
+	pthread_mutex_lock(&mutex);
+	moveToSummary(config, 2, 130);
+	const char *stateString = monitor_getStateString(state);
+	fprintf(stdout, "%20s %3d %d", stateString, delay, loopsUntilVoltage);
+	fflush(stdout);
+	pthread_mutex_unlock(&mutex);
+}
+
 void console_init(struct config_t *configArg) {
 	config = configArg;
 	canEventListener_registerVoltageListener(voltageListener);
@@ -263,5 +273,6 @@ void console_init(struct config_t *configArg) {
 	canEventListener_registerErrorListener(errorListener);
 	canEventListener_registerLatencyListener(latencyListener);
 	canEventListener_registerChargerStateListener(chargerStateListener);
+	canEventListener_registerMonitorStateListener(monitorStateListener);
 	soc_registerSocEventListener(console_printSoc);
 }

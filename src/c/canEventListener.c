@@ -57,6 +57,7 @@ static void (*cellConfigListeners[10])(unsigned char, unsigned short, unsigned s
 static void (*errorListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*latencyListeners[10])(unsigned char, unsigned short, unsigned char);
 static void (*chargerStateListeners[10])(unsigned char, unsigned char, unsigned char);
+static void (*monitorStateListeners[10])(monitor_state_t, __u16, __u8);
 static void (*rawCanListeners[10])(struct can_frame *frame);
 
 volatile char canEventListener_error = 1;
@@ -142,6 +143,16 @@ static void decodeChargerState(struct can_frame *frame) {
 	}
 }
 
+static void decodeMonitorState(struct can_frame *frame) {
+	unsigned char state = bufToChar(frame->data);
+	unsigned char delay = bufToShort(frame->data + 1);
+	unsigned char loopsBeforeVoltage = bufToChar(frame->data + 3);
+
+	for (int i = 0; monitorStateListeners[i]; i++) {
+		monitorStateListeners[i](state, delay, loopsBeforeVoltage);
+	}
+}
+
 static void decodeFrame(struct can_frame *frame) {
 	switch (frame->can_id) {
 	case 0x3f0:
@@ -170,6 +181,9 @@ static void decodeFrame(struct can_frame *frame) {
 		break;
 	case 0x3f8:
 		decodeChargerState(frame);
+		break;
+	case 0x3f9:
+		decodeMonitorState(frame);
 		break;
 	default:
 		for (int i = 0; rawCanListeners[i]; i++) {
@@ -288,6 +302,15 @@ void canEventListener_registerChargerStateListener(void (*chargerStateListener)(
 	}
 	chargerStateListeners[i] = chargerStateListener;
 }
+
+void canEventListener_registerMonitorStateListener(void (*monitorStateListener)(monitor_state_t, __u16, __u8)) {
+	int i = 0;
+	while (monitorStateListeners[i] != NULL) {
+		i++;
+	}
+	monitorStateListeners[i] = monitorStateListener;
+}
+
 
 void canEventListener_registerRawCanListener(void (*rawCanListener)(struct can_frame *frame)) {
 	int i = 0;

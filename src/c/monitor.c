@@ -306,13 +306,15 @@ int main() {
 	while (TRUE) {
 		time_t t;
 		time(&t);
-		if (t < last + config->loopDelay) {
+		while (t < last + config->loopDelay) {
+			monitorCan_sendMonitorState(SLEEPING, (last + config->loopDelay) - t, count % 5);
 			sleep(1);
-			continue;
+			time(&t);
 		}
 		count++;
 		last = t;
 		if (config->loopDelay > 30) {
+			monitorCan_sendMonitorState(WAKE_SLAVE, 0, count % 5);
 			// if the slaves have gone to sleep, send some characters to wake them up
 			writeWithEscape('a');
 			// wait for slaves to wake up and take a measurement
@@ -322,25 +324,31 @@ int main() {
 		// if necessary, turn off shunts and read the voltage
 		shuntPause = turnOffNonKelvinResistorShunts();
 		if (count % 5 == 0) {
+			monitorCan_sendMonitorState(TURN_OFF_NON_KELVIN_TRANSISTOR, 0, count % 5);
 			shuntPause = turnOffNonKelvinTransistorShunts() || shuntPause;
 		}
 		if (shuntPause) {
 			// give cells time to read their real voltage
+			monitorCan_sendMonitorState(WAIT_FOR_VOLTAGE_READING, 0, count % 5);
 			sleep(2);
 		}
+		monitorCan_sendMonitorState(READ_VOLTAGE, 0, count % 5);
 		getCellStates();
 
 		// turn (back) on any shunts that are needed
 		shuntPause = FALSE;
 		unsigned char shuntValueChanged = FALSE;
 		for (unsigned char i = 0; i < data.batteryCount; i++) {
+			monitorCan_sendMonitorState(TURN_ON_SHUNTS, i, count % 5);
 			shuntValueChanged |= setShuntCurrent(config, &data.batteries[i]);
 		}
 		// if we turned on any shunts, read the shunt current
 		if (shuntValueChanged) {
 			// give cells a chance re-read
+			monitorCan_sendMonitorState(WAIT_FOR_SHUNT_CURRENT, 0, count % 5);
 			sleep(2);
 			// read the current
+			monitorCan_sendMonitorState(READ_CURRENT, 0, count % 5);
 			getCellStates();
 		}
 	}
@@ -863,4 +871,28 @@ void initData(struct config_t *config) {
 			cell->minCurrent = 999;
 		}
 	}
+}
+
+const char *monitor_getStateString(monitor_state_t state) {
+	switch (state) {
+	case START :
+		return "Start";
+	case SLEEPING :
+		return "Sleeping";
+	case WAKE_SLAVE :
+		return "Waking Slaves";
+	case TURN_OFF_NON_KELVIN_TRANSISTOR :
+		return "Turn off shunts";
+	case WAIT_FOR_VOLTAGE_READING :
+		return "Wait for valid data";
+	case READ_VOLTAGE :
+		return "Reading voltage";
+	case TURN_ON_SHUNTS :
+		return "Turn on shunts";
+	case WAIT_FOR_SHUNT_CURRENT :
+		return "Wait for data";
+	case READ_CURRENT :
+		return "Reading current";
+	}
+	return "unknown";
 }

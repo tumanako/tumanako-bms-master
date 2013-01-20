@@ -18,6 +18,9 @@
  <http://www.gnu.org/licenses/>.
  */
 
+#ifndef TUMANAKO_MONITOR_H_
+#define TUMANAKO_MONITOR_H_
+
 struct status_t {
 	struct battery_t *battery;
 	unsigned short cellIndex;
@@ -68,3 +71,18 @@ struct monitor_t {
 	struct battery_t *batteries;
 };
 
+typedef enum {
+	START,
+	SLEEPING,
+	WAKE_SLAVE,
+	TURN_OFF_NON_KELVIN_TRANSISTOR,
+	WAIT_FOR_VOLTAGE_READING,
+	READ_VOLTAGE,
+	TURN_ON_SHUNTS,
+	WAIT_FOR_SHUNT_CURRENT,
+	READ_CURRENT,
+} monitor_state_t;
+
+const char *monitor_getStateString(monitor_state_t reason);
+
+#endif

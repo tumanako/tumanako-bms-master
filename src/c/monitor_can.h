@@ -22,6 +22,7 @@
 
 #include <net/if.h>
 #include <linux/can.h>
+#include "monitor.h"
 
 int monitorCan_init();
 
@@ -35,5 +36,6 @@ void monitorCan_sendHardware(const unsigned char batteryIndex, const short cellI
 void monitorCan_sendError(const unsigned char batteryIndex, const short cellIndex, const short errorCount);
 void monitorCan_sendLatency(const unsigned char batteryIndex, const short cellIndex, const unsigned char latency);
 void monitorCan_sendChargerState(const unsigned char shutdown, const unsigned char state, const unsigned char reason);
+void monitorCan_sendMonitorState(const monitor_state_t state, const __u16 delay, const __u8 loopsBeforeVoltage);
 
 #endif /* TUMANAKO_CAN_H_ */

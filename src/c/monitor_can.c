@@ -176,6 +176,10 @@ void monitorCan_sendChargerState(const unsigned char shutdown, const unsigned ch
 	monitorCan_send3Char(0x3f8, shutdown, state, reason);
 }
 
+void monitorCan_sendMonitorState(const monitor_state_t state, __u16 delay, const __u8 loopsBeforeVoltage) {
+	monitorCan_sendCharShortChar(0x3f9, state, delay, loopsBeforeVoltage);
+}
+
 void monitorCan_sendChar2Shorts(const short frameId, const char c, const short s1, const short s2) {
 	struct can_frame frame;
 	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */
