@@ -302,8 +302,8 @@ int main() {
 	sleep(1);
 
 	time_t last = 0;
-	int count = 0;
-	while (TRUE) {
+	for (int count = 0; TRUE; count++) {
+		monitorCan_sendMonitorState(START, 0, count % 5);
 		time_t t;
 		time(&t);
 		while (t < last + config->loopDelay) {
@@ -311,7 +311,6 @@ int main() {
 			sleep(1);
 			time(&t);
 		}
-		count++;
 		last = t;
 		if (config->loopDelay > 30) {
 			monitorCan_sendMonitorState(WAKE_SLAVE, 0, count % 5);
