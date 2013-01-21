@@ -18,6 +18,8 @@
  <http://www.gnu.org/licenses/>.
  */
 
+#include <unistd.h>
+
 #include "u3.h"
 #include "chargercontrol.h"
 #include "buscontrol.h"
@@ -28,8 +30,8 @@
 #define CHARGE_CURRENT_OVERSAMPLING 5
 #define CHARGE_CURRENT_CHANNEL 4
 
-int setWatchdog(HANDLE hDevice, char reset);
-double getReading(int channel);
+static int setWatchdog(HANDLE hDevice, char reset);
+static double getReading(int channel);
 
 int fd;
 
@@ -39,7 +41,7 @@ u3CalibrationInfo caliInfo;
 HANDLE hDevice;
 long DAC1Enable;
 
-int chargercontrol_init() {
+int chargercontrol_labjack_init() {
 	if ((hDevice = openUSBConnection(LJ_ID)) == NULL) {
 		fprintf(stderr, "no labjack?\n");
 		return 1;
@@ -62,18 +64,13 @@ int chargercontrol_init() {
 	return 0;
 }
 
-void chargercontrol_shutdown() {
+void chargercontrol_labjack_shutdown() {
 	fprintf(stderr, "shutdown\n");
 	chargercontrol_setCharger(0);
 	buscontrol_setBus(0);
 }
 
-int buscontrol_init() {
-	// don't need to do any additional setup
-	return 0;
-}
-
-void chargercontrol_setCharger(char on) {
+void chargercontrol_labjack_setCharger(char on) {
 	fprintf(stderr, "setCharger\n");
 	if (on) {
 		eDO(hDevice, 1, CHARGER_RELAY_PORT, 1);
@@ -82,7 +79,7 @@ void chargercontrol_setCharger(char on) {
 	}
 }
 
-void buscontrol_setBus(char on) {
+void buscontrol_labjack_setBus(char on) {
 	fprintf(stderr, "setBus\n");
 	if (on) {
 		eDO(hDevice, 1, BUS_RELAY_PORT, 1);
@@ -93,7 +90,7 @@ void buscontrol_setBus(char on) {
 	sleep(1);
 }
 
-int setWatchdog(HANDLE hDevice, char reset) {
+static int setWatchdog(HANDLE hDevice, char reset) {
 	fprintf(stderr, "setWatchdog\n");
 	uint8 sendBuff[26];
 	uint8 recBuff[38];
@@ -169,7 +166,7 @@ int setWatchdog(HANDLE hDevice, char reset) {
 	return 0;
 }
 
-double getReading(int channel) {
+static double getReading(int channel) {
 	fprintf(stderr, "getReading\n");
 	double value = 0;
 	for (int j = 0; j < CHARGE_CURRENT_OVERSAMPLING; j++) {
@@ -183,7 +180,7 @@ double getReading(int channel) {
 	return value / CHARGE_CURRENT_OVERSAMPLING;
 }
 
-double chargercontrol_getChargeCurrent() {
+double chargercontrol_labjack_getChargeCurrent() {
 	fprintf(stderr, "getChargeCurrent\n");
 	double value = getReading(CHARGE_CURRENT_CHANNEL);
 	double result = (chargeCurrentZero - value) / 0.020 * (3 / 2.7);
