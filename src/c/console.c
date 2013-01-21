@@ -43,6 +43,9 @@ static unsigned short minVoltageCell;
 static unsigned long totalVoltage = 0;
 static unsigned long totalVoltageCount = 0;
 
+static unsigned short *lastMaxVoltage;
+static unsigned short *lastMinVoltage;
+
 static struct config_t *config;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -121,14 +124,17 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 					asDouble(maxVoltage), maxVoltageCell, asDouble(totalVoltage));
 			fflush(stdout);
 		}
+		lastMinVoltage[batteryIndex] = minVoltage;
+		lastMaxVoltage[batteryIndex] = maxVoltage;
 		minVoltage = 0xffff;
 		maxVoltage = 0;
 		totalVoltage = 0;
 		totalVoltageCount = 0;
 	}
 
-	unsigned short maxVoltageHundreds = maxVoltage / 100 * 100;
-	unsigned short barMin = 3000;
+	unsigned short minVoltageHundreds = lastMinVoltage[batteryIndex] / 100 * 100;
+	unsigned short maxVoltageHundreds = lastMaxVoltage[batteryIndex] / 100 * 100;
+	unsigned short barMin = minVoltageHundreds;
 	unsigned char tens;
 	unsigned char hundreds;
 	if (voltage < barMin) {
@@ -137,6 +143,10 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 	} else {
 		tens = (voltage / 10) % 10;
 		hundreds = ((voltage / 100 * 100) - barMin) / 100;
+	}
+	if (hundreds > 2) {
+		hundreds = 2;
+		tens = 9;
 	}
 	fprintf(stderr, "%d %d %d %d %d %d\n", voltage, maxVoltage, maxVoltageHundreds, barMin, tens, hundreds);
 	moveToCell(config, batteryIndex, cellIndex, 54);
@@ -155,10 +165,10 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 		}
 	}
 	if (hundreds < 2) {
-		printf("         ");
+		printf("          ");
 	}
 	if (hundreds < 1) {
-		printf("         ");
+		printf("          ");
 	}
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
@@ -265,6 +275,8 @@ static void monitorStateListener(monitor_state_t state, __u16 delay, __u8 loopsU
 
 void console_init(struct config_t *configArg) {
 	config = configArg;
+	lastMaxVoltage = malloc(sizeof(unsigned short) * config->batteryCount);
+	lastMinVoltage = malloc(sizeof(unsigned short) * config->batteryCount);
 	canEventListener_registerVoltageListener(voltageListener);
 	canEventListener_registerShuntCurrentListener(shuntCurrentListener);
 	canEventListener_registerMinCurrentListener(minCurrentListener);
