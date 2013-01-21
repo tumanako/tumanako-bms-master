@@ -10,7 +10,7 @@ MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 SRCS=$(wildcard *.c)
 HDRS=$(wildcard *.h)
 
-CFLAGS=-std=c99 -Wextra -Wall -g -I$(LIB_LABJACK_USB)/liblabjackusb -I$(LIB_LABJACK_USB)/examples/U3
+CFLAGS=-std=c99 -Werror -Wextra -Wall -g -I$(LIB_LABJACK_USB)/liblabjackusb -I$(LIB_LABJACK_USB)/examples/U3
 CC=gcc
 LDFLAGS=$(CHARGER_CONTROL_LDFLAGS) -lusb-1.0 $(LIB_LABJACK_USB)/liblabjackusb/labjackusb.o
 LIBS=-lm -lpthread -lconfuse $(CHARGER_CONTROL_LIBS)
