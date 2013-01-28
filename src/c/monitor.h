@@ -57,6 +57,7 @@ struct status_t {
 	unsigned short errorCount;
 	// true if we have current data for this cell
 	unsigned short isDataCurrent;
+	unsigned char isShuntForcedOn;
 };
 
 struct battery_t {
@@ -84,5 +85,9 @@ typedef enum {
 } monitor_state_t;
 
 const char *monitor_getStateString(monitor_state_t reason);
+
+// exposing this is a bit nasty
+void setShuntForcedOnForShuntingCells();
+void clearShuntForcedOn();
 
 #endif

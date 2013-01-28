@@ -35,7 +35,7 @@ void monitorCan_sendHardware(const unsigned char batteryIndex, const short cellI
 		const unsigned char hasTemperatureSensor, const unsigned short revision, const unsigned char isClean);
 void monitorCan_sendError(const unsigned char batteryIndex, const short cellIndex, const short errorCount);
 void monitorCan_sendLatency(const unsigned char batteryIndex, const short cellIndex, const unsigned char latency);
-void monitorCan_sendChargerState(const unsigned char shutdown, const unsigned char state, const unsigned char reason);
+void monitorCan_sendChargerState(const unsigned char shutdown, const unsigned char state, const unsigned char reason, const __s16 shuntDelay);
 void monitorCan_sendMonitorState(const monitor_state_t state, const __u16 delay, const __u8 loopsBeforeVoltage);
 
 #endif /* TUMANAKO_CAN_H_ */

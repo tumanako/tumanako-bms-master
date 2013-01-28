@@ -245,13 +245,13 @@ static void latencyListener(unsigned char batteryIndex, unsigned short cellIndex
 	pthread_mutex_unlock(&mutex);
 }
 
-static void chargerStateListener(unsigned char shutdown, unsigned char state, unsigned char reason) {
+static void chargerStateListener(unsigned char shutdown, unsigned char state, unsigned char reason, __u16 shuntDelay) {
 	pthread_mutex_lock(&mutex);
-	moveToSummary(config, 2, 90);
+	moveToSummary(config, 2, 85);
 	const char *reasonString = chargeAlgorithm_getStateChangeReasonString(reason);
 	const char *shutdownString = shutdown ? "Shutdown" : "Running";
 	const char *stateString = state ? "On" : "Off";
-	fprintf(stdout, "%8s %3s %18s", shutdownString, stateString, reasonString);
+	fprintf(stdout, "%8s %3s %18s %4d", shutdownString, stateString, reasonString, shuntDelay);
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
 }

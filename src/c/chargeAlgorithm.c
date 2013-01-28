@@ -41,6 +41,7 @@ static unsigned short maxVoltage = 0;
 
 static time_t whenChargerOn = 0;
 static time_t whenLastValid;
+static time_t whenTurnedOff = 0;
 static char chargerShutdown = 0;
 static char chargerState = 0;
 static chargerStateChangeReason_t chargerStateChangeReason = UNDEFINED;
@@ -77,19 +78,23 @@ static void doChargerControl() {
 		chargerStateChangeReason = DATA_TIMEOUT;
 	}
 
+	__u16 shuntingDelay = 0;
 	// do charger control stuff
 	if (chargerShutdown) {
 		// charging is finished or we had an error
 		chargercontrol_setCharger(FALSE);
 		chargerState = 0;
+		clearShuntForcedOn();
 	} else if (chargerState == 1) {
 		// charger is on, find a reason to turn it off
 		chargercontrol_setCharger(TRUE);
+		clearShuntForcedOn();
 		if (maxVoltage > CHARGER_OFF_VOLTAGE) {
 			// over voltage, turn off the charger
 			chargercontrol_setCharger(FALSE);
 			chargerState = 0;
 			chargerStateChangeReason = OVER_VOLTAGE;
+			whenTurnedOff = now;
 		} else if (invalidCount == 0 && minVoltage > END_OF_CHARGE_VOLTAGE && soc_getCurrent() > -4) {
 			// charging is finished
 			chargercontrol_setCharger(FALSE);
@@ -103,12 +108,24 @@ static void doChargerControl() {
 				chargercontrol_setCharger(FALSE);
 				chargerState = 0;
 				chargerStateChangeReason = CHARGE_CURRENT_TOO_LOW;
+				whenTurnedOff = now;
 			}
 		}
 	} else {
-		chargercontrol_setCharger(FALSE);
 		// charger is off, find a reason to turn it on
-		if (invalidCount != 0) {
+		chargercontrol_setCharger(FALSE);
+		setShuntForcedOnForShuntingCells();
+		fprintf(stderr, "shunt delay %ld %ld %d %ld\n",whenTurnedOff, now, whenTurnedOff + 10 * 60 > now, whenTurnedOff + 10 * 60 - now);
+		if (whenTurnedOff == 0) {
+			shuntingDelay = 0;
+		} else if (whenTurnedOff + 30 * 60 > now) {
+			shuntingDelay = whenTurnedOff + 30 * 60 - now;
+		} else {
+			shuntingDelay = 0;
+		}
+		if (shuntingDelay > 0) {
+			chargerStateChangeReason = SHUNT_WAIT;
+		} else if (invalidCount != 0) {
 			// we didn't get voltages for every cell, can't use this pass to turn on the charger
 			chargerStateChangeReason = NEED_COMPLETE_DATA_FOR_RESTART;
 		} else {
@@ -117,12 +134,12 @@ static void doChargerControl() {
 				chargercontrol_setCharger(TRUE);
 				chargerState = 1;
 				chargerStateChangeReason = LOW_VOLTAGE;
-				time(&whenChargerOn);
+				whenChargerOn = now;
 			}
 		}
 	}
-	fprintf(stderr, "chargerState %d %d %d\n", chargerShutdown, chargerState, chargerStateChangeReason);
-	monitorCan_sendChargerState(chargerShutdown, chargerState, chargerStateChangeReason);
+	fprintf(stderr, "chargerState %d %d %d %d\n", chargerShutdown, chargerState, chargerStateChangeReason, shuntingDelay);
+	monitorCan_sendChargerState(chargerShutdown, chargerState, chargerStateChangeReason, shuntingDelay);
 }
 
 static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char isValid, unsigned short voltage) {
@@ -178,6 +195,8 @@ const char *chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason_
 		return "End of Charge";
 	case CHARGE_CURRENT_TOO_LOW :
 		return "Current too low";
+	case SHUNT_WAIT :
+		return "Shunting";
 	case NEED_COMPLETE_DATA_FOR_RESTART :
 		return "Incomplete Data";
 	case LOW_VOLTAGE :

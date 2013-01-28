@@ -123,6 +123,18 @@ void monitorCan_send3Char(const short frameId, const char c1, const char c2, con
 	monitorCan_send(&frame);
 }
 
+void monitorCan_send3CharShort(const short frameId, const char c1, const char c2, const char c3, const __s16 s1) {
+	struct can_frame frame;
+	memset(&frame, 0, sizeof(struct can_frame)); /* init CAN frame, e.g. DLC = 0 */
+	frame.can_id = frameId;
+	frame.can_dlc = 5;
+	charToBuf(c1, frame.data);
+	charToBuf(c2, frame.data + 1);
+	charToBuf(c3, frame.data + 2);
+	shortToBuf(s1, frame.data + 3);
+	monitorCan_send(&frame);
+}
+
 /* Initialisation function, return 0 if successful */
 int monitorCan_init() {
 	getSocket();
@@ -172,8 +184,9 @@ void monitorCan_sendLatency(const unsigned char batteryIndex, const short cellIn
 	monitorCan_sendCharShortChar(0x3f6, batteryIndex, cellIndex, latency);
 }
 
-void monitorCan_sendChargerState(const unsigned char shutdown, const unsigned char state, const unsigned char reason) {
-	monitorCan_send3Char(0x3f8, shutdown, state, reason);
+void monitorCan_sendChargerState(const unsigned char shutdown, const unsigned char state, const unsigned char reason,
+		const __s16 shuntDelay) {
+	monitorCan_send3CharShort(0x3f8, shutdown, state, reason, shuntDelay);
 }
 
 void monitorCan_sendMonitorState(const monitor_state_t state, __u16 delay, const __u8 loopsBeforeVoltage) {

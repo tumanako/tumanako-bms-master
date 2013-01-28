@@ -56,7 +56,7 @@ static void (*temperatureListeners[10])(unsigned char, unsigned short, unsigned 
 static void (*cellConfigListeners[10])(unsigned char, unsigned short, unsigned short, unsigned char);
 static void (*errorListeners[10])(unsigned char, unsigned short, unsigned short);
 static void (*latencyListeners[10])(unsigned char, unsigned short, unsigned char);
-static void (*chargerStateListeners[10])(unsigned char, unsigned char, unsigned char);
+static void (*chargerStateListeners[10])(unsigned char, unsigned char, unsigned char, __u16);
 static void (*monitorStateListeners[10])(monitor_state_t, __u16, __u8);
 static void (*rawCanListeners[10])(struct can_frame *frame);
 
@@ -137,9 +137,10 @@ static void decodeChargerState(struct can_frame *frame) {
 	unsigned char shutdown = bufToChar(frame->data);
 	unsigned char state = bufToChar(frame->data + 1);
 	unsigned char reason = bufToChar(frame->data + 2);
+	__u16 shuntDelay = bufToShort(frame->data + 3);
 
 	for (int i = 0; chargerStateListeners[i]; i++) {
-		chargerStateListeners[i](shutdown, state, reason);
+		chargerStateListeners[i](shutdown, state, reason, shuntDelay);
 	}
 }
 
@@ -295,7 +296,8 @@ void canEventListener_registerLatencyListener(void (*latencyListener)(unsigned c
 	latencyListeners[i] = latencyListener;
 }
 
-void canEventListener_registerChargerStateListener(void (*chargerStateListener)(unsigned char, unsigned char, unsigned char)) {
+void canEventListener_registerChargerStateListener(void (*chargerStateListener)(unsigned char, unsigned char,
+		unsigned char, __u16)) {
 	int i = 0;
 	while (chargerStateListeners[i] != NULL) {
 		i++;
