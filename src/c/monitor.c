@@ -217,6 +217,75 @@ unsigned char turnOffNonKelvinTransistorShunts() {
 	return changed;
 }
 
+void testCellShunt(struct status_t *cell) {
+	if (cell->minCurrent != 0) {
+		printf("cell already commanded to higher current?\n");
+		exit(1);
+	}
+	if (cell->iShunt > 20) {
+		printf("cell %d already shunting: %d\n", cell->cellIndex, cell->iShunt);
+	}
+	setMinCurrent(cell, 450);
+	if (cell->isResistorShunt) {
+		sleep(2);
+		getCellSummary(cell);
+	} else {
+		for (int i = 0; i < 15; i++) {
+			sleep(2);
+			getCellSummary(cell);
+			if (cell->iShunt > 350) {
+				break;
+			}
+		}
+	}
+	struct status_t *previous = 0;
+	if (cell->cellIndex != 0) {
+		previous = cell->battery->cells + (cell->cellIndex - 1);
+		getCellSummary(previous);
+		if (previous->iShunt > 20) {
+			printf("cell %d caused cell %d to shunt, %d & %d\n", cell->cellIndex, previous->cellIndex,
+					cell->iShunt, previous->iShunt);
+		}
+	}
+	struct status_t *next = 0;
+	if (cell->cellIndex != cell->battery->cellCount - 1) {
+		next = cell->battery->cells + (cell->cellIndex + 1);
+		getCellSummary(next);
+		if (next->iShunt > 20) {
+			printf("cell %d caused cell %d to shunt, %d & %d\n", cell->cellIndex, next->cellIndex,
+					cell->iShunt, next->iShunt);
+		}
+	}
+	printf("%3d: %d\n", cell->cellIndex, cell->iShunt);
+	setMinCurrent(cell, 0);
+	sleep(2);
+	getCellSummary(cell);
+	if (previous) {
+		getCellSummary(previous);
+	}
+	if (next) {
+		getCellSummary(next);
+	}
+}
+
+void testCellShunts() {
+	printf("testing shunts\n");
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			struct status_t *cell = battery->cells + j;
+			getCellSummary(cell);
+			printf("%3d: %d\n", cell->cellIndex, cell->iShunt);
+		}
+	}
+	for (unsigned char i = 0; i < data.batteryCount; i++) {
+		struct battery_t *battery = data.batteries + i;
+		for (unsigned short j = 0; j < battery->cellCount; j++) {
+			struct status_t *cell = battery->cells + j;
+			testCellShunt(cell);
+		}
+	}
+}
 
 int main() {
 	struct termios oldtio, newtio;
