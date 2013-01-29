@@ -251,7 +251,7 @@ static void chargerStateListener(unsigned char shutdown, unsigned char state, un
 	const char *reasonString = chargeAlgorithm_getStateChangeReasonString(reason);
 	const char *shutdownString = shutdown ? "Shutdown" : "Running";
 	const char *stateString = state ? "On" : "Off";
-	fprintf(stdout, "%8s %3s %18s %4d", shutdownString, stateString, reasonString, shuntDelay);
+	fprintf(stdout, "%8s %3s %18s %5d", shutdownString, stateString, reasonString, shuntDelay);
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
 }
