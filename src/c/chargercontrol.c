@@ -18,6 +18,7 @@
  <http://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
 #include <linux/types.h>
 #include "chargercontrol.h"
 #include "chargercontrol_labjack.h"
@@ -27,6 +28,7 @@ static __u8 useLabjack;
 int chargercontrol_init() {
 	if (chargercontrol_labjack_init() == 0) {
 		useLabjack = 1;
+		printf("Using labjack to control charger\n");
 	}
 	return 0;
 }
