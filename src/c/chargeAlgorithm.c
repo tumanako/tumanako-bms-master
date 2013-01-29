@@ -49,6 +49,8 @@ static unsigned short validCount;
 static unsigned short invalidCount;
 static char errorLastTime = 0;
 
+#define CHARGER_CONTROL_BATTERY_INDEX 1
+
 static void doChargerControl() {
 	// do error checking stuff
 	if (soc_getError()) {
@@ -56,7 +58,7 @@ static void doChargerControl() {
 		chargerShutdown = TRUE;
 		chargerStateChangeReason = SOC_ERROR;
 	}
-	unsigned short expectedCount = config->batteries[2].cellCount;
+	unsigned short expectedCount = config->batteries[CHARGER_CONTROL_BATTERY_INDEX].cellCount;
 	if (validCount + invalidCount != expectedCount) {
 		fprintf(stderr, "got %d + %d = %d expected %d\n", validCount, invalidCount, validCount + invalidCount, config->batteries[2].cellCount);
 		if (errorLastTime) {
@@ -143,9 +145,9 @@ static void doChargerControl() {
 }
 
 static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned char isValid, unsigned short voltage) {
-	fprintf(stderr, "charger voltageLisenter %d %d %d %d\n", batteryIndex, cellIndex, isValid, voltage);
-	// we only control the charger in battery 2
-	if (batteryIndex != 2) {
+	fprintf(stderr, "charger voltageListener %d %d %d %d\n", batteryIndex, cellIndex, isValid, voltage);
+	// we only control the charger in one battery
+	if (batteryIndex != CHARGER_CONTROL_BATTERY_INDEX) {
 		return;
 	}
 	if (!isValid) {
@@ -159,7 +161,7 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 			minVoltage = voltage;
 		}
 	}
-	if (cellIndex == config->batteries[2].cellCount - 1) {
+	if (cellIndex == config->batteries[CHARGER_CONTROL_BATTERY_INDEX].cellCount - 1) {
 		fprintf(stderr, "doing charge control %d %d\n", minVoltage, maxVoltage);
 		doChargerControl();
 		maxVoltage = 0;
