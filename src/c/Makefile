@@ -4,7 +4,19 @@
 
 LIB_LABJACK_USB = ../../../../../exodriver
 
-MONITOR_SRC=monitor.c crc.c soc_evision.c monitor_can.c logger.c util.c config.c console.c canEventListener.c chargeAlgorithm.c chargercontrol.c chargercontrol_labjack.c $(LIB_LABJACK_USB)/examples/U3/u3.c 
+MONITOR_SRC=monitor.c \
+	crc.c \
+	soc_evision.c \
+	monitor_can.c \
+	logger.c \
+	util.c \
+	config.c \
+	console.c \
+	canEventListener.c \
+	chargeAlgorithm.c \
+	chargercontrol.c \
+	chargercontrol_labjack.c \
+	$(LIB_LABJACK_USB)/examples/U3/u3.c 
 MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 
 SRCS=$(wildcard *.c)
