@@ -1,5 +1,5 @@
 /*
- Copyright 2009-2012 Tom Parker
+ Copyright 2009-2013 Tom Parker
 
  This file is part of the Tumanako EVD5 BMS.
 
@@ -21,9 +21,6 @@
 
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <termios.h>
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,9 +40,9 @@
 #include "monitor_can.h"
 #include "logger.h"
 #include "console.h"
+#include "serial.h"
 #include "util.h"
 
-#define BAUDRATE B9600
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
@@ -69,11 +66,9 @@ void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
 void decodeBinStatus(unsigned char *buf, struct status_t *to);
-void writeSlowly(unsigned char *s, int length);
 crc_t writeCrc(unsigned char c, crc_t crc);
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc);
 void writeWithEscape(unsigned char c);
-int readEnough(unsigned char *buf, int length);
 unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned char length, struct timeval *end);
 unsigned short maxVoltageInAnyBattery();
 unsigned short maxVoltage(struct battery_t *battery);
@@ -95,8 +90,6 @@ unsigned char getCellVersion(struct status_t *cell);
 void getSlaveVersions();
 
 unsigned char shuntPause = 0;
-
-int fd;
 
 struct monitor_t data;
 
@@ -288,8 +281,6 @@ void testCellShunts() {
 }
 
 int main() {
-	struct termios oldtio, newtio;
-
 	struct config_t *config = getConfig();
 	if (!config) {
 		printf("error reading configuration file\n");
@@ -319,31 +310,15 @@ int main() {
 		return 1;
 	}
 
+	if (serial_openSerialPort(config) != 0) {
+		printf("error opening serial port\n");
+		return 1;
+	}
+
 	console_init(config);
 	chargeAlgorithm_init(config);
 
 	buscontrol_setBus(TRUE);
-	fd = open(config->serialPort, O_RDWR | O_NOCTTY);
-	if (fd < 0) {
-		perror(config->serialPort);
-		return -1;
-	}
-
-	tcgetattr(fd, &oldtio); /* save current port settings */
-
-	bzero(&newtio, sizeof(newtio));
-	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-	newtio.c_iflag = IGNPAR;
-	newtio.c_oflag = 0;
-
-	/* set input mode (non-canonical, no echo,...) */
-	newtio.c_lflag = 0;
-
-	newtio.c_cc[VTIME] = 1;
-	newtio.c_cc[VMIN] = 10;
-
-	tcflush(fd, TCIFLUSH);
-	tcsetattr(fd, TCSANOW, &newtio);
 
 	// send a byte to wake up the slaves
 	writeWithEscape('a');
@@ -420,7 +395,6 @@ int main() {
 			getCellStates();
 		}
 	}
-	tcsetattr(fd, TCSANOW, &oldtio);
 }
 
 void getCellStates() {
@@ -506,7 +480,7 @@ unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned cha
 	unsigned char actualLength = 0;
 	unsigned char escape = FALSE;
 	while (actualLength != length) {
-		if (!readEnough(buf + actualLength, 1)) {
+		if (!serial_readEnough(buf + actualLength, 1)) {
 			fprintf(stderr, "read %d, expected %d from cell %d (id %2d) in %s\n", actualLength, length,
 					cell->cellIndex, cell->cellId, cell->battery->name);
 			dumpBuffer(buf, actualLength);
@@ -786,77 +760,33 @@ void sendCommand(struct status_t *cell, unsigned char command) {
 }
 
 crc_t writeCrc(unsigned char c, crc_t crc) {
-	writeSlowly(&c, 1);
+	serial_writeSlowly(&c, 1);
 	return crc_update(crc, &c, 1);
 }
 
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc) {
 	if (c == START_OF_PACKET || c == ESCAPE_CHARACTER) {
 		unsigned char ff = 0xff;
-		writeSlowly(&ff, 1);
+		serial_writeSlowly(&ff, 1);
 	}
-	writeSlowly(&c, 1);
+	serial_writeSlowly(&c, 1);
 	return crc_update(crc, &c, 1);
 }
 
 void writeWithEscape(unsigned char c) {
 	if (c == START_OF_PACKET || c == ESCAPE_CHARACTER) {
 		unsigned char ff = 0xff;
-		writeSlowly(&ff, 1);
+		serial_writeSlowly(&ff, 1);
 	}
-	writeSlowly(&c, 1);
-}
-
-void writeSlowly(unsigned char *s, int length) {
-	//printf("%s\n", s);
-	for (int i = 0; i < length; i++) {
-		write(fd, s + i, 1);
-		//usleep(100000);
-	}
-}
-
-int readEnough(unsigned char *buf, int length) {
-	fd_set rfds;
-	struct timeval tv;
-
-	FD_ZERO(&rfds);
-	FD_SET(fd, &rfds);
-
-	tv.tv_sec = 0;
-	tv.tv_usec = 200000;
-
-	int actual = 0;
-	for (int i = 0; i < 5; i++) {
-		int retval = select(fd + 1, &rfds, NULL, NULL, &tv);
-		if (retval == -1) {
-			fflush(NULL);
-			return actual;
-		}
-		if (!retval) {
-			fflush(NULL);
-			continue;
-		}
-		actual += read(fd, buf + actual, length - actual);
-		if (DEBUG) {
-			fprintf(stderr, "read %d expecting %d: ", actual, length);
-			for (int j = 0; j < actual; j++) {
-				fprintf(stderr, "%02x ", buf[j]);
-			}
-			fprintf(stderr, "\n");
-		}
-		if (actual >= length) {
-			break;
-		}
-	}
-	return actual;
+	serial_writeSlowly(&c, 1);
 }
 
 /** read all the data in the input buffers, used instead of a start of message byte to re-sync */
 void flushInputBuffer() {
 	unsigned char buf[255];
-	int length = readEnough(buf, 255);
+	int length = serial_readEnough(buf, 255);
 	do {
-		length = readEnough(buf, 255);
+		length = serial_readEnough(buf, 255);
 		fprintf(stderr, "read %d more\n", length);
 		dumpBuffer(buf, length);
 	} while (length > 0);

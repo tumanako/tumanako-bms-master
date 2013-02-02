@@ -37,7 +37,7 @@ struct config_t *getConfig() {
 			CFG_END()
 	};
 	cfg_opt_t opts[] = {
-			CFG_STR("serialPort", "/dev/ttyS0", CFGF_NONE),
+			CFG_STR("serialPort", NULL, CFGF_NONE),
 			CFG_INT("loopDelay", 10, CFGF_NONE),
 			CFG_INT("minVoltageSocRelevant", 3400, CFGF_NONE),
 			CFG_INT("voltageDeadband", 25, CFGF_NONE),
