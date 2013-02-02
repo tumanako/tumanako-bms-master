@@ -69,11 +69,11 @@ void getCellStates();
 char getCellState(struct status_t *cell);
 char _getCellState(struct status_t *status, int attempts);
 void decodeBinStatus(unsigned char *buf, struct status_t *to);
-void writeSlowly(int fd, unsigned char *s, int length);
+void writeSlowly(unsigned char *s, int length);
 crc_t writeCrc(unsigned char c, crc_t crc);
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc);
 void writeWithEscape(unsigned char c);
-int readEnough(int fd, unsigned char *buf, int length);
+int readEnough(unsigned char *buf, int length);
 unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned char length, struct timeval *end);
 unsigned short maxVoltageInAnyBattery();
 unsigned short maxVoltage(struct battery_t *battery);
@@ -506,7 +506,7 @@ unsigned char readPacket(struct status_t *cell, unsigned char *buf, unsigned cha
 	unsigned char actualLength = 0;
 	unsigned char escape = FALSE;
 	while (actualLength != length) {
-		if (!readEnough(fd, buf + actualLength, 1)) {
+		if (!readEnough(buf + actualLength, 1)) {
 			fprintf(stderr, "read %d, expected %d from cell %d (id %2d) in %s\n", actualLength, length,
 					cell->cellIndex, cell->cellId, cell->battery->name);
 			dumpBuffer(buf, actualLength);
@@ -786,28 +786,28 @@ void sendCommand(struct status_t *cell, unsigned char command) {
 }
 
 crc_t writeCrc(unsigned char c, crc_t crc) {
-	writeSlowly(fd, &c, 1);
+	writeSlowly(&c, 1);
 	return crc_update(crc, &c, 1);
 }
 
 crc_t writeWithEscapeCrc(unsigned char c, crc_t crc) {
 	if (c == START_OF_PACKET || c == ESCAPE_CHARACTER) {
 		unsigned char ff = 0xff;
-		writeSlowly(fd, &ff, 1);
+		writeSlowly(&ff, 1);
 	}
-	writeSlowly(fd, &c, 1);
+	writeSlowly(&c, 1);
 	return crc_update(crc, &c, 1);
 }
 
 void writeWithEscape(unsigned char c) {
 	if (c == START_OF_PACKET || c == ESCAPE_CHARACTER) {
 		unsigned char ff = 0xff;
-		writeSlowly(fd, &ff, 1);
+		writeSlowly(&ff, 1);
 	}
-	writeSlowly(fd, &c, 1);
+	writeSlowly(&c, 1);
 }
 
-void writeSlowly(int fd, unsigned char *s, int length) {
+void writeSlowly(unsigned char *s, int length) {
 	//printf("%s\n", s);
 	for (int i = 0; i < length; i++) {
 		write(fd, s + i, 1);
@@ -815,7 +815,7 @@ void writeSlowly(int fd, unsigned char *s, int length) {
 	}
 }
 
-int readEnough(int fd, unsigned char *buf, int length) {
+int readEnough(unsigned char *buf, int length) {
 	fd_set rfds;
 	struct timeval tv;
 
@@ -854,9 +854,9 @@ int readEnough(int fd, unsigned char *buf, int length) {
 /** read all the data in the input buffers, used instead of a start of message byte to re-sync */
 void flushInputBuffer() {
 	unsigned char buf[255];
-	int length = readEnough(fd, buf, 255);
+	int length = readEnough(buf, 255);
 	do {
-		length = readEnough(fd, buf, 255);
+		length = readEnough(buf, 255);
 		fprintf(stderr, "read %d more\n", length);
 		dumpBuffer(buf, length);
 	} while (length > 0);
