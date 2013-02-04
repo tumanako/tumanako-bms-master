@@ -113,6 +113,14 @@ void *logger_backgroundThread(void *unused __attribute__ ((unused))) {
 	return NULL;
 }
 
+static void logCenti(FILE *out, unsigned short value, char isValid) {
+	if (isValid) {
+		fprintf(out, " %.1f", centiToDouble(value));
+	} else {
+		fprintf(out, " -");
+	}
+}
+
 /*
  * Write a line to the log if:
  * The appropriate amount of time has passed (so we don't log too quickly)
@@ -156,6 +164,7 @@ void logger_writeLogLine(unsigned char i) {
 		struct logger_status_t *cell = loggerBattery->cells + i;
 		logMilli(loggerBattery->out, cell->voltage, cell->valued & 0x01);
 		logMilli(loggerBattery->out, cell->shuntCurrent, cell->valued & 0x02);
+		logCenti(loggerBattery->out, cell->temperature, cell->valued & 0x04);
 		cell->valued = 0;
 	}
 	fprintf(loggerBattery->out, "\n");
