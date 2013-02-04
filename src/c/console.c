@@ -256,10 +256,10 @@ static void chargerStateListener(unsigned char shutdown, unsigned char state, un
 	pthread_mutex_unlock(&mutex);
 }
 
-static void console_printSoc() {
+static void socListener() {
 	pthread_mutex_lock(&mutex);
 	moveToSummary(config, 2, 55);
-	printf("%6.2fV %7.2fA %7.2fAh", soc_getVoltage(), soc_getCurrent(), soc_getAh());
+	printf("%6.2fV %7.2fA %7.2fAh %7.2fWh", soc_getVoltage(), soc_getCurrent(), soc_getAh(), soc_getWh());
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
 }
@@ -286,5 +286,5 @@ void console_init(struct config_t *configArg) {
 	canEventListener_registerLatencyListener(latencyListener);
 	canEventListener_registerChargerStateListener(chargerStateListener);
 	canEventListener_registerMonitorStateListener(monitorStateListener);
-	soc_registerSocEventListener(console_printSoc);
+	soc_registerSocEventListener(socListener);
 }

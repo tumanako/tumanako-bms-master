@@ -38,5 +38,8 @@ double soc_getHalfVoltage();
 /** Get the state of charge. Positive is discharged, negative is over charged. */
 double soc_getAh();
 
+/** Get the Wh consumed. Positive is discharged, negative is over charged. */
+double soc_getWh();
+
 void soc_registerSocEventListener(void (*socEventListener)());
 

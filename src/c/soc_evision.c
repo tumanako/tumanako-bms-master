@@ -39,6 +39,7 @@ volatile long chargeCurrent = 0;
 volatile long dischargeCurrent = 0;
 volatile short aH = 0;
 volatile short halfVoltage = 0;
+volatile long wH = 0;
 
 time_t lastValidCurrent;
 time_t lastValidVoltage;
@@ -69,6 +70,22 @@ static unsigned long make24BitLong(__u8 *c) {
 	return result;
 }
 
+/**
+ * Make a long from the 32 bits starting at c
+ *
+ * TODO deal with endian
+ */
+static long makeLong(__u8 *c) {
+	long result = c[0];
+	result = result << 8;
+	result = result | c[1];
+	result = result << 8;
+	result = result | c[2];
+	result = result << 8;
+	result = result | c[3];
+	return result;
+}
+
 double soc_getCurrent() {
 	if (chargeCurrent != 0) {
 		return chargeCurrent / (double) -100;
@@ -89,6 +106,10 @@ double soc_getAh() {
 
 double soc_getHalfVoltage() {
 	return halfVoltage / (double) 100;
+}
+
+double soc_getWh() {
+	return wH / (double) 100;
 }
 
 char soc_getError() {
@@ -113,11 +134,17 @@ static void decode705(struct can_frame *frame) {
 	aH = makeShort(frame->data + 1);
 }
 
+static void decode706(struct can_frame *frame) {
+	wH = makeLong(frame->data);
+}
+
 void rawCanListener(struct can_frame *frame) {
 	if (frame->can_id == 0x703) {
 		decode703(frame);
 	} else if (frame->can_id == 0x705) {
 		decode705(frame);
+	} else if (frame->can_id == 0x706) {
+		decode706(frame);
 	} else if (frame->can_id == 0x701) {
 		decode701(frame);
 	} else {
