@@ -47,5 +47,8 @@ double soc_getT1();
 /** Get EVision temperature 2 */
 double soc_getT2();
 
+/** Get speed */
+double soc_getSpeed();
+
 void soc_registerSocEventListener(void (*socEventListener)());
 

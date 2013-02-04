@@ -42,6 +42,7 @@ volatile short halfVoltage = 0;
 volatile long wH = 0;
 volatile short t1 = 0;
 volatile short t2 = 0;
+volatile short speed = 0;
 
 time_t lastValidCurrent;
 time_t lastValidVoltage;
@@ -122,6 +123,10 @@ double soc_getT2() {
 	return t2 / (double) 100;
 }
 
+double soc_getSpeed() {
+	return speed / (double) 100;
+}
+
 char soc_getError() {
 	time_t now;
 	time(&now);
@@ -153,6 +158,10 @@ static void decode704(struct can_frame *frame) {
 	t2 = makeShort(frame->data + 4);
 }
 
+static void decode708(struct can_frame *frame) {
+	speed = makeShort(frame->data);
+}
+
 void rawCanListener(struct can_frame *frame) {
 	if (frame->can_id == 0x703) {
 		decode703(frame);
@@ -164,6 +173,8 @@ void rawCanListener(struct can_frame *frame) {
 		decode701(frame);
 	} else if (frame->can_id == 0x704) {
 		decode704(frame);
+	} else if (frame->can_id == 0x708) {
+		decode708(frame);
 	} else {
 		return;
 	}
