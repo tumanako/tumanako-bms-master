@@ -40,6 +40,8 @@ volatile long dischargeCurrent = 0;
 volatile short aH = 0;
 volatile short halfVoltage = 0;
 volatile long wH = 0;
+volatile short t1 = 0;
+volatile short t2 = 0;
 
 time_t lastValidCurrent;
 time_t lastValidVoltage;
@@ -112,6 +114,14 @@ double soc_getWh() {
 	return wH / (double) 100;
 }
 
+double soc_getT1() {
+	return t1 / (double) 100;
+}
+
+double soc_getT2() {
+	return t2 / (double) 100;
+}
+
 char soc_getError() {
 	time_t now;
 	time(&now);
@@ -138,6 +148,11 @@ static void decode706(struct can_frame *frame) {
 	wH = makeLong(frame->data);
 }
 
+static void decode704(struct can_frame *frame) {
+	t1 = makeShort(frame->data + 2);
+	t2 = makeShort(frame->data + 4);
+}
+
 void rawCanListener(struct can_frame *frame) {
 	if (frame->can_id == 0x703) {
 		decode703(frame);
@@ -147,6 +162,8 @@ void rawCanListener(struct can_frame *frame) {
 		decode706(frame);
 	} else if (frame->can_id == 0x701) {
 		decode701(frame);
+	} else if (frame->can_id == 0x704) {
+		decode704(frame);
 	} else {
 		return;
 	}

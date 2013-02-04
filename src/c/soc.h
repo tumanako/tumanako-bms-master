@@ -41,5 +41,11 @@ double soc_getAh();
 /** Get the Wh consumed. Positive is discharged, negative is over charged. */
 double soc_getWh();
 
+/** Get EVision temperature 1 */
+double soc_getT1();
+
+/** Get EVision temperature 2 */
+double soc_getT2();
+
 void soc_registerSocEventListener(void (*socEventListener)());
 

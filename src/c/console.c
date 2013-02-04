@@ -258,8 +258,9 @@ static void chargerStateListener(unsigned char shutdown, unsigned char state, un
 
 static void socListener() {
 	pthread_mutex_lock(&mutex);
-	moveToSummary(config, 2, 55);
-	printf("%6.2fV %7.2fA %7.2fAh %7.2fWh", soc_getVoltage(), soc_getCurrent(), soc_getAh(), soc_getWh());
+	moveToSummary(config, 2, 10);
+	printf("%6.2fV %7.2fA %7.2fAh %7.2fWh %5.1fC %5.1fC", soc_getVoltage(), soc_getCurrent(), soc_getAh(),
+			soc_getWh(), soc_getT1(), soc_getT2());
 	fflush(stdout);
 	pthread_mutex_unlock(&mutex);
 }
