@@ -17,6 +17,7 @@
  along with the Tumanako EVD5 BMS.  If not, see
  <http://www.gnu.org/licenses/>.
  */
+#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -256,12 +257,21 @@ static void chargerStateListener(unsigned char shutdown, unsigned char state, un
 	pthread_mutex_unlock(&mutex);
 }
 
+struct timeval last;
+
 static void socListener() {
 	pthread_mutex_lock(&mutex);
-	moveToSummary(config, 2, 10);
-	printf("%6.2fV %7.2fA %7.2fAh %7.2fWh %5.1fC %5.1fC %3.0fkm/h", soc_getVoltage(), soc_getCurrent(), soc_getAh(),
-			soc_getWh(), soc_getT1(), soc_getT2(), soc_getSpeed());
-	fflush(stdout);
+	// only update the soc stuff every 500ms.
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	if ((now.tv_sec - last.tv_sec) * 1000000 + (now.tv_usec - last.tv_usec) > 500000) {
+		moveToSummary(config, 2, 10);
+		printf("%6.2fV %7.2fA %7.2fAh %7.2fWh %5.1fC %5.1fC %3.0fkm/h", soc_getVoltage(), soc_getCurrent(), soc_getAh(),
+				soc_getWh(), soc_getT1(), soc_getT2(), soc_getSpeed());
+		fflush(stdout);
+		last.tv_sec = now.tv_sec;
+		last.tv_usec = now.tv_usec;
+	}
 	pthread_mutex_unlock(&mutex);
 }
 
