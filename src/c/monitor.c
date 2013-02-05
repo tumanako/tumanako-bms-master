@@ -891,6 +891,7 @@ void initData(struct config_t *config) {
 			cell->isDataCurrent = FALSE;
 			cell->minCurrent = 999;
 			cell->isShuntForcedOn = FALSE;
+			cell->targetShuntCurrent = 999;
 		}
 	}
 }
