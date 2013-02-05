@@ -33,6 +33,7 @@
 #include "canEventListener.h"
 
 static void (*socEventListeners[10])();
+static void (*instVoltageListeners[10])();
 
 volatile unsigned short volts = 0;
 volatile long chargeCurrent = 0;
@@ -43,6 +44,11 @@ volatile long wH = 0;
 volatile short t1 = 0;
 volatile short t2 = 0;
 volatile short speed = 0;
+
+volatile unsigned short instVolts = 0;
+volatile unsigned short instHalfVoltage = 0;
+volatile long instChargeCurrent = 0;
+volatile long instDischargeCurrent = 0;
 
 time_t lastValidCurrent;
 time_t lastValidVoltage;
@@ -111,6 +117,24 @@ double soc_getHalfVoltage() {
 	return halfVoltage / (double) 100;
 }
 
+double soc_getInstCurrent() {
+	if (instChargeCurrent != 0) {
+		return instChargeCurrent / (double) -100;
+	}
+	if (instDischargeCurrent != 0) {
+		return instDischargeCurrent / (double) 100;
+	}
+	return 0;
+}
+
+double soc_getInstVoltage() {
+	return instVolts / (double) 100;
+}
+
+double soc_getInstHalfVoltage() {
+	return instHalfVoltage / (double) 100;
+}
+
 double soc_getWh() {
 	return wH / (double) 100;
 }
@@ -133,10 +157,23 @@ char soc_getError() {
 	return now - lastValidVoltage > 5 || now - lastValidCurrent > 5;
 }
 
+static void decode700(struct can_frame *frame) {
+	instDischargeCurrent = make24BitLong(frame->data + 4);
+	instChargeCurrent = make24BitLong(frame->data);
+}
+
 static void decode701(struct can_frame *frame) {
 	dischargeCurrent = make24BitLong(frame->data + 4);
 	chargeCurrent = make24BitLong(frame->data);
 	time(&lastValidCurrent);
+}
+
+static void decode702(struct can_frame *frame) {
+	instVolts = makeShort(frame->data + 1);
+	instHalfVoltage = makeShort(frame->data + 4);
+	for (int i = 0; instVoltageListeners[i]; i++) {
+		instVoltageListeners[i]();
+	}
 }
 
 static void decode703(struct can_frame *frame) {
@@ -175,6 +212,10 @@ void rawCanListener(struct can_frame *frame) {
 		decode704(frame);
 	} else if (frame->can_id == 0x708) {
 		decode708(frame);
+	} else if (frame->can_id == 0x700) {
+		decode700(frame);
+	} else if (frame->can_id == 0x702) {
+		decode702(frame);
 	} else {
 		return;
 	}
@@ -196,4 +237,12 @@ void soc_registerSocEventListener(void (*socEventListener)()) {
 		i++;
 	}
 	socEventListeners[i] = socEventListener;
+}
+
+void soc_registerInstVoltageListener(void (*instVoltageListener)()) {
+	int i = 0;
+	while (instVoltageListeners[i] != NULL) {
+		i++;
+	}
+	instVoltageListeners[i] = instVoltageListener;
 }

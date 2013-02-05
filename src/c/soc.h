@@ -35,6 +35,15 @@ double soc_getVoltage();
 /** Get the half-pack voltage */
 double soc_getHalfVoltage();
 
+/** Get the current, negative is charging, positive is discharging */
+double soc_getInstCurrent();
+
+/** Get the voltage */
+double soc_getInstVoltage();
+
+/** Get the half-pack voltage */
+double soc_getInstHalfVoltage();
+
 /** Get the state of charge. Positive is discharged, negative is over charged. */
 double soc_getAh();
 
@@ -51,4 +60,4 @@ double soc_getT2();
 double soc_getSpeed();
 
 void soc_registerSocEventListener(void (*socEventListener)());
-
+void soc_registerInstVoltageListener(void (*instVoltageListner)());
