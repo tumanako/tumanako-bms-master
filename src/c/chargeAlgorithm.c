@@ -29,7 +29,7 @@
 
 #define CHARGER_ON_VOLTAGE 3450
 #define CHARGER_OFF_VOLTAGE 3650
-#define END_OF_CHARGE_VOLTAGE 3500
+#define END_OF_CHARGE_VOLTAGE 3450
 
 #define FALSE 0
 #define TRUE 1
@@ -174,7 +174,7 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 
 void chargeAlgorithm_init(struct config_t *_config) {
 	config = _config;
-	if (config->loopDelay > 10) {
+	if (config->loopDelay > 20) {
 		chargerShutdown = 1;
 	} else {
 		canEventListener_registerVoltageListener(voltageListener);
