@@ -17,6 +17,7 @@ MONITOR_SRC=monitor.c \
 	chargercontrol.c \
 	chargercontrol_labjack.c \
 	serial.c \
+	shuntAlgorithm.c \
 	$(LIB_LABJACK_USB)/examples/U3/u3.c 
 MONITOR_OBJ=$(MONITOR_SRC:.c=.o)
 

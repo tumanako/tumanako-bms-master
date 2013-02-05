@@ -1,5 +1,5 @@
 /*
- Copyright 2012 Tom Parker
+ Copyright 2012, 2013 Tom Parker
 
  This file is part of the Tumanako EVD5 BMS.
 
@@ -83,6 +83,12 @@ typedef enum {
 	WAIT_FOR_SHUNT_CURRENT,
 	READ_CURRENT,
 } monitor_state_t;
+
+typedef enum {
+	MONITOR_MODE_DRIVING,
+	MONITOR_MODE_CHARGING,
+	MONITOR_MODE_SLEEPING
+} monitor_mode_t;
 
 const char *monitor_getStateString(monitor_state_t reason);
 

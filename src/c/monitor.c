@@ -34,6 +34,7 @@
 #include "crc.h"
 #include "chargercontrol.h"
 #include "chargeAlgorithm.h"
+#include "shuntAlgorithm.h"
 #include "canEventListener.h"
 #include "buscontrol.h"
 #include "soc.h"
@@ -92,6 +93,7 @@ void getSlaveVersions();
 unsigned char shuntPause = 0;
 
 struct monitor_t data;
+static __u8 isCharging = TRUE;
 
 void decodeSummary3(unsigned char *buf, struct status_t *to) {
 	if (!shuntPause) {
@@ -281,6 +283,9 @@ void testCellShunts() {
 }
 
 int main() {
+	// TODO move tests somewhere better
+	testIsCellVoltageRelevant();
+
 	struct config_t *config = getConfig();
 	if (!config) {
 		printf("error reading configuration file\n");
@@ -581,9 +586,6 @@ void clearShuntForcedOn() {
 }
 
 unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery) {
-	if (soc_getCurrent() < -3) {
-		return FALSE;
-	}
 	unsigned short maxTemperature = getMaxTemperature(battery);
 	unsigned short maxShuntCurrent;
 	if (maxTemperature < 3000) {
@@ -593,19 +595,32 @@ unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery
 	} else if (maxTemperature < 5000) {
 		maxShuntCurrent = 300;
 	} else {
-		maxShuntCurrent = 150;
+		maxShuntCurrent = 200;
 	}
+	maxShuntCurrent = 200;
 	unsigned short min = minVoltage(battery);
 	unsigned char changed = FALSE;
 	for (unsigned short i = 0; i < battery->cellCount; i++) {
 		struct status_t *cell = battery->cells + i;
-		unsigned short target;
-		if (cell->vCell < config->minVoltageSocRelevant) {
-			target = 0;
-		} else if (cell->vCell < min + config->voltageDeadband) {
-			target = 0;
+		double current;
+		monitor_mode_t mode;
+		if (i == 0) {
+			// we don't monitor accessory battery current
+			current = 0;
+			mode = MONITOR_MODE_CHARGING;
 		} else {
+			current = soc_getCurrent();
+			if (isCharging) {
+				mode = MONITOR_MODE_CHARGING;
+			} else {
+				mode = MONITOR_MODE_DRIVING;
+			}
+		}
+		__u16 target;
+		if (shuntAlgorithm_shouldCellShunt(cell, min, current, mode, chargeAlgorithm_isChargerOn())) {
 			target = maxShuntCurrent;
+		} else {
+			target = 0;
 		}
 		if (target < config->minShuntCurrent) {
 			target = config->minShuntCurrent;
