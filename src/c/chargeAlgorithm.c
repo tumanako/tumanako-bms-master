@@ -86,11 +86,9 @@ static void doChargerControl() {
 		// charging is finished or we had an error
 		chargercontrol_setCharger(FALSE);
 		chargerState = 0;
-		clearShuntForcedOn();
 	} else if (chargerState == 1) {
 		// charger is on, find a reason to turn it off
 		chargercontrol_setCharger(TRUE);
-		clearShuntForcedOn();
 		if (maxVoltage > CHARGER_OFF_VOLTAGE) {
 			// over voltage, turn off the charger
 			chargercontrol_setCharger(FALSE);
@@ -120,7 +118,6 @@ static void doChargerControl() {
 	} else {
 		// charger is off, find a reason to turn it on
 		chargercontrol_setCharger(FALSE);
-		setShuntForcedOnForShuntingCells();
 		fprintf(stderr, "shunt delay %ld %ld %d %ld\n",whenTurnedOff, now, whenTurnedOff + 10 * 60 > now, whenTurnedOff + 10 * 60 - now);
 		if (whenTurnedOff == 0) {
 			shuntingDelay = 0;

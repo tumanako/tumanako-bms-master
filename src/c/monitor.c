@@ -562,29 +562,6 @@ unsigned short getMaxTemperature(struct battery_t *battery) {
 	return result;
 }
 
-void setShuntForcedOnForShuntingCells() {
-	for (unsigned char i = 0; i < data.batteryCount; i++) {
-		struct battery_t *battery = data.batteries + i;
-		for (unsigned short j = 0; j < battery->cellCount; j++) {
-			struct status_t *cell = battery->cells + j;
-			if (cell->targetShuntCurrent != 0) {
-				cell->isShuntForcedOn = TRUE;
-			}
-		}
-	}
-
-}
-
-void clearShuntForcedOn() {
-	for (unsigned char i = 0; i < data.batteryCount; i++) {
-		struct battery_t *battery = data.batteries + i;
-		for (unsigned short j = 0; j < battery->cellCount; j++) {
-			struct status_t *cell = battery->cells + j;
-			cell->isShuntForcedOn = FALSE;
-		}
-	}
-}
-
 unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery) {
 	unsigned short maxTemperature = getMaxTemperature(battery);
 	unsigned short maxShuntCurrent;
@@ -905,7 +882,6 @@ void initData(struct config_t *config) {
 			cell->errorCount = 0;
 			cell->isDataCurrent = FALSE;
 			cell->minCurrent = 999;
-			cell->isShuntForcedOn = FALSE;
 			cell->targetShuntCurrent = 999;
 		}
 	}
