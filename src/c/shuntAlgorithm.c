@@ -40,9 +40,6 @@ static __u8 isCellVoltageSocRelevant(__u16 voltage, double current) {
 
 __u8 shuntAlgorithm_shouldCellShunt(struct status_t *cell, __u16 minVoltage, double current,
 		monitor_mode_t mode, __u8 isChargerOn) {
-	if (cell->isShuntForcedOn) {
-		return TRUE;
-	}
 	if (mode != MONITOR_MODE_CHARGING) {
 		return FALSE;
 	}
