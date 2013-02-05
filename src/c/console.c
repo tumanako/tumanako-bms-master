@@ -286,6 +286,7 @@ static void monitorStateListener(monitor_state_t state, __u16 delay, __u8 loopsU
 
 void console_init(struct config_t *configArg) {
 	config = configArg;
+	gettimeofday(&last, NULL);
 	lastMaxVoltage = malloc(sizeof(unsigned short) * config->batteryCount);
 	lastMinVoltage = malloc(sizeof(unsigned short) * config->batteryCount);
 	canEventListener_registerVoltageListener(voltageListener);
