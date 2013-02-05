@@ -158,8 +158,8 @@ void logger_writeLogLine(unsigned char i) {
 		}
 	}
 
-	fprintf(loggerBattery->out, "%d %.1f %.2f %.2f %.2f %.2f %.1f - %.1f", (int) now, soc_getCurrent(), soc_getAh(),
-			soc_getVoltage(), soc_getHalfVoltage(), soc_getWh(), soc_getT1(), soc_getSpeed());
+	fprintf(loggerBattery->out, "%d %.1f %.2f %.2f %.2f %.2f %.1f %.1f %.1f", (int) now, soc_getCurrent(), soc_getAh(),
+			soc_getVoltage(), soc_getHalfVoltage(), soc_getWh(), soc_getT1(), soc_getT2(), soc_getSpeed());
 	for (int i = 0; i < configBattery->cellCount; i++) {
 		struct logger_status_t *cell = loggerBattery->cells + i;
 		logMilli(loggerBattery->out, cell->voltage, cell->valued & 0x01);
