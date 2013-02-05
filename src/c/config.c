@@ -42,6 +42,8 @@ struct config_t *getConfig() {
 			CFG_INT("minVoltageSocRelevant", 3400, CFGF_NONE),
 			CFG_INT("voltageDeadband", 25, CFGF_NONE),
 			CFG_INT("minShuntCurrent", 0, CFGF_NONE),
+			CFG_INT("maxBootTemperature", 0, CFGF_NONE),
+			CFG_INT("maxCellTemperature", 0, CFGF_NONE),
 			CFG_SEC("battery", battery_opts, CFGF_TITLE | CFGF_MULTI),
 			CFG_END()
 	};
@@ -65,6 +67,8 @@ struct config_t *getConfig() {
 	result->minVoltageSocRelevant = cfg_getint(cfg, "minVoltageSocRelevant");
 	result->voltageDeadband = cfg_getint(cfg, "voltageDeadband");
 	result->minShuntCurrent = cfg_getint(cfg, "minShuntCurrent");
+	result->maxBootTemperature = cfg_getint(cfg, "maxBootTemperature");
+	result->maxCellTemperature = cfg_getint(cfg, "maxCellTemperature");
 	result->batteryCount = cfg_size(cfg, "battery");
 	result->batteries = malloc(sizeof(struct config_battery_t) * result->batteryCount);
 	for (unsigned int i = 0; i < cfg_size(cfg, "battery"); i++) {
