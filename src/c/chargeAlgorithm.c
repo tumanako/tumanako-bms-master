@@ -140,7 +140,8 @@ static void doChargerControl() {
 			}
 		}
 	}
-	fprintf(stderr, "chargerState %d %d %d %d\n", chargerShutdown, chargerState, chargerStateChangeReason, shuntingDelay);
+	fprintf(stderr, "chargerState %d %d %s %d\n", chargerShutdown, chargerState,
+			chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason), shuntingDelay);
 	monitorCan_sendChargerState(chargerShutdown, chargerState, chargerStateChangeReason, shuntingDelay);
 }
 
