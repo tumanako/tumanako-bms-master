@@ -17,7 +17,13 @@
  along with the Tumanako EVD5 BMS.  If not, see
  <http://www.gnu.org/licenses/>.
  */
-void chargeAlgorithm_init(struct config_t *_config);
+
+#ifndef CHARGE_ALGORITHM_H
+#define CHARGE_ALGORITHM_H
+
+#include <linux/types.h>
+#include "config.h"
+
 
 typedef enum {
 	UNDEFINED,
@@ -33,4 +39,10 @@ typedef enum {
 
 } chargerStateChangeReason_t;
 
+void chargeAlgorithm_init(struct config_t *_config);
+
+__u8 chargeAlgorithm_isChargerOn();
+
 const char *chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason_t reason);
+
+#endif

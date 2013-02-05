@@ -186,6 +186,10 @@ void chargeAlgorithm_init(struct config_t *_config) {
 	}
 }
 
+__u8 chargeAlgorithm_isChargerOn() {
+	return chargerState;
+}
+
 const char *chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason_t reason) {
 	switch (reason) {
 	case UNDEFINED :
