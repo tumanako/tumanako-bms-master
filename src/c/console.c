@@ -64,7 +64,7 @@ void moveToCell(struct config_t *config, unsigned char batteryIndex, unsigned sh
 	unsigned char x;
 	unsigned char y;
 	if (cellIndex >= config->batteries[batteryIndex].cellCount / 2) {
-		x = 88;
+		x = 84;
 		y = cellIndex - config->batteries[batteryIndex].cellCount / 2;
 	} else {
 		x = 1;
