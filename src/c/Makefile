@@ -16,6 +16,7 @@ MONITOR_SRC=monitor.c \
 	chargeAlgorithm.c \
 	chargercontrol.c \
 	chargercontrol_labjack.c \
+	hiResLogger.c \
 	serial.c \
 	shuntAlgorithm.c \
 	$(LIB_LABJACK_USB)/examples/U3/u3.c 

@@ -43,6 +43,7 @@
 #include "console.h"
 #include "serial.h"
 #include "util.h"
+#include "hiResLogger.h"
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
@@ -93,7 +94,8 @@ void getSlaveVersions();
 unsigned char shuntPause = 0;
 
 struct monitor_t data;
-static __u8 isCharging = TRUE;
+static __u8 isCharging = FALSE;
+static __u8 isDriving = TRUE;
 
 void decodeSummary3(unsigned char *buf, struct status_t *to) {
 	if (!shuntPause) {
@@ -295,10 +297,6 @@ int main() {
 
 	canEventListener_init(config);
 
-	if (chargercontrol_init()) {
-		return 1;
-	}
-
 	if (buscontrol_init()) {
 		return 1;
 	}
@@ -321,7 +319,16 @@ int main() {
 	}
 
 	console_init(config);
-	chargeAlgorithm_init(config);
+	if (isCharging) {
+		if (chargercontrol_init()) {
+			return 1;
+		}
+		chargeAlgorithm_init(config);
+	}
+
+	if (isDriving) {
+		hiResLogger_init();
+	}
 
 	buscontrol_setBus(TRUE);
 
