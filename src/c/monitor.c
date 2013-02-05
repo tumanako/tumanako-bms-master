@@ -571,10 +571,13 @@ unsigned char setShuntCurrent(struct config_t *config, struct battery_t *battery
 		maxShuntCurrent = 400;
 	} else if (maxTemperature < 5000) {
 		maxShuntCurrent = 300;
-	} else {
+	} else if (maxTemperature < 7000) {
 		maxShuntCurrent = 200;
+	} else if (maxTemperature < 8000) {
+		maxShuntCurrent = 150;
+	} else {
+		maxShuntCurrent = 0;
 	}
-	maxShuntCurrent = 200;
 	unsigned short min = minVoltage(battery);
 	unsigned char changed = FALSE;
 	for (unsigned short i = 0; i < battery->cellCount; i++) {

@@ -38,6 +38,7 @@ static struct config_t *config;
 
 static unsigned short minVoltage = 0xffff;
 static unsigned short maxVoltage = 0;
+static unsigned short maxShuntTemperature = 0;
 
 static time_t whenChargerOn = 0;
 static time_t whenLastValid;
@@ -57,6 +58,17 @@ static void doChargerControl() {
 		fprintf(stderr, "State of Charge error?");
 		chargerShutdown = TRUE;
 		chargerStateChangeReason = SOC_ERROR;
+	}
+	if (config->maxBootTemperature) {
+		printf("boo");
+	}
+	if (soc_getT1() > config->maxBootTemperature || soc_getT2() > config->maxBootTemperature) {
+		chargerShutdown = TRUE;
+		chargerStateChangeReason = OVER_BOOT_TEMPERATURE;
+	}
+	if (maxShuntTemperature > config->maxCellTemperature) {
+		chargerShutdown = TRUE;
+		chargerStateChangeReason = OVER_SHUNT_TEMPERATURE;
 	}
 	unsigned short expectedCount = config->batteries[CHARGER_CONTROL_BATTERY_INDEX].cellCount;
 	if (validCount + invalidCount != expectedCount) {
@@ -173,12 +185,20 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 	}
 }
 
+static void temperatureListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short temperature) {
+	if (temperature > maxShuntTemperature) {
+		fprintf(stderr, "max temperature at %d %d: %d", batteryIndex, cellIndex, temperature);
+		maxShuntTemperature = temperature;
+	}
+}
+
 void chargeAlgorithm_init(struct config_t *_config) {
 	config = _config;
 	if (config->loopDelay > 20) {
 		chargerShutdown = 1;
 	} else {
 		canEventListener_registerVoltageListener(voltageListener);
+		canEventListener_registerTemperatureListener(temperatureListener);
 		time(&whenLastValid);
 	}
 }
@@ -199,6 +219,10 @@ const char *chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason_
 		return "Data Timeout";
 	case OVER_VOLTAGE :
 		return "Over Voltage";
+	case OVER_SHUNT_TEMPERATURE :
+		return "Over Shunt Temperature";
+	case OVER_BOOT_TEMPERATURE :
+		return "Over Boot Temperature";
 	case END_OF_CHARGE :
 		return "End of Charge";
 	case CHARGE_CURRENT_TOO_LOW :

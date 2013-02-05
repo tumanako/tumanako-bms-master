@@ -37,6 +37,8 @@ struct config_t {
 	unsigned short minVoltageSocRelevant;
 	unsigned short voltageDeadband;
 	unsigned short minShuntCurrent;
+	unsigned short maxBootTemperature;
+	unsigned short maxCellTemperature;
 	unsigned char batteryCount;
 	struct config_battery_t *batteries;
 };
