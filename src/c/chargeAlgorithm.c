@@ -103,7 +103,11 @@ static void doChargerControl() {
 			chargerState = 0;
 			chargerStateChangeReason = END_OF_CHARGE;
 			chargerShutdown = TRUE;
-		} else if (soc_getCurrent() > -3) {
+		} else if (
+				(soc_getCurrent() > -3 && maxVoltage > 3500) ||
+				(soc_getCurrent() > -2 && maxVoltage > 3450) ||
+				(soc_getCurrent() > -1 && maxVoltage > 3400)
+				) {
 			// charging current is too low
 			// did we just just turn it on?
 			if (now - whenChargerOn > 10) {
