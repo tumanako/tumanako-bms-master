@@ -385,7 +385,7 @@ int main(int argc, char *argv[]) {
 		if (current > 1) {
 			whenLastOver1A = t;
 		}
-		if (!isCharging && t - whenLastOver1A > 10) {
+		if (!isCharging && t - whenLastOver1A > 60) {
 			config->loopDelay = 300;
 			hiResLogger_stop();
 			isDriving = FALSE;
