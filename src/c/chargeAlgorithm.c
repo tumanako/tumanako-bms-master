@@ -66,7 +66,8 @@ static void doChargerControl() {
 		chargerShutdown = TRUE;
 		chargerStateChangeReason = OVER_BOOT_TEMPERATURE;
 	}
-	if (maxShuntTemperature > config->maxCellTemperature) {
+	if (maxShuntTemperature / 1000 > config->maxCellTemperature) {
+		printf("max temp %d %d\n", maxShuntTemperature, config->maxCellTemperature);
 		chargerShutdown = TRUE;
 		chargerStateChangeReason = OVER_SHUNT_TEMPERATURE;
 	}
