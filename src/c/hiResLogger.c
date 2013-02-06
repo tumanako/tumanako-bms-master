@@ -18,21 +18,42 @@
  <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/types.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #include "soc.h"
 
 FILE *logFile;
 
+static volatile __u8 logging = 0;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static void voltageListener() {
-	struct timeval t;
-	gettimeofday(&t, NULL);
-	double now = t.tv_sec + t.tv_usec / (double) 1000000;
-	fprintf(logFile, "%.3f %.2f %.2f\n", now, soc_getInstVoltage(), soc_getInstCurrent());
+	if (logging) {
+		struct timeval t;
+		gettimeofday(&t, NULL);
+		double now = t.tv_sec + t.tv_usec / (double) 1000000;
+		pthread_mutex_lock(&mutex);
+		fprintf(logFile, "%.3f %.2f %.2f %.1f\n", now, soc_getInstVoltage(), soc_getInstCurrent(), soc_getSpeed());
+		pthread_mutex_unlock(&mutex);
+	}
 }
 
 void hiResLogger_init() {
 	logFile = fopen("hiRes.txt", "a");
 	soc_registerInstVoltageListener(voltageListener);
+}
+
+void hiResLogger_start() {
+	logging = 1;
+}
+
+void hiResLogger_stop() {
+	logging = 0;
+	pthread_mutex_lock(&mutex);
+	fprintf(logFile, "\n");
+	fflush(logFile);
+	pthread_mutex_unlock(&mutex);
 }

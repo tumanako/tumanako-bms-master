@@ -95,7 +95,7 @@ unsigned char shuntPause = 0;
 
 struct monitor_t data;
 static __u8 isCharging = FALSE;
-static __u8 isDriving = TRUE;
+static __u8 isDriving = FALSE;
 
 void decodeSummary3(unsigned char *buf, struct status_t *to) {
 	if (!shuntPause) {
@@ -284,7 +284,7 @@ void testCellShunts() {
 	}
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	// TODO move tests somewhere better
 	testIsCellVoltageRelevant();
 
@@ -294,6 +294,14 @@ int main() {
 		return 1;
 	}
 	initData(config);
+
+	if (argc == 2) {
+		if (strcmp("-c", argv[1]) == 0) {
+			isCharging = TRUE;
+			isDriving = FALSE;
+			config->loopDelay = 20;
+		}
+	}
 
 	canEventListener_init(config);
 
@@ -326,9 +334,7 @@ int main() {
 		chargeAlgorithm_init(config);
 	}
 
-	if (isDriving) {
-		hiResLogger_init();
-	}
+	hiResLogger_init();
 
 	buscontrol_setBus(TRUE);
 
@@ -356,7 +362,7 @@ int main() {
 	getSlaveVersions();
 	turnOffAllShunts();
 	sleep(1);
-
+	time_t whenLastOver1A = 0;
 	time_t last = 0;
 	for (int count = 0; TRUE; count++) {
 		monitorCan_sendMonitorState(START, 0, count % 5);
@@ -365,7 +371,24 @@ int main() {
 		while (t < last + config->loopDelay) {
 			monitorCan_sendMonitorState(SLEEPING, (last + config->loopDelay) - t, count % 5);
 			sleep(1);
+			if (!isCharging && soc_getCurrent() > 1) {
+				// more than 1A discharge, must be driving
+				config->loopDelay = 2;
+				if (!isDriving) {
+					isDriving = TRUE;
+					hiResLogger_start();
+				}
+			}
 			time(&t);
+		}
+		double current = soc_getCurrent();
+		if (current > 1) {
+			whenLastOver1A = t;
+		}
+		if (!isCharging && t - whenLastOver1A > 10) {
+			config->loopDelay = 300;
+			hiResLogger_stop();
+			isDriving = FALSE;
 		}
 		last = t;
 		if (config->loopDelay > 30) {

@@ -19,3 +19,5 @@
  */
 
 extern void hiResLogger_init();
+extern void hiResLogger_start();
+extern void hiResLogger_stop();
