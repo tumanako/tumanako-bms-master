@@ -371,8 +371,8 @@ int main(int argc, char *argv[]) {
 		while (t < last + config->loopDelay) {
 			monitorCan_sendMonitorState(SLEEPING, (last + config->loopDelay) - t, count % 5);
 			sleep(1);
-			if (!isCharging && soc_getCurrent() > 1) {
-				// more than 1A discharge, must be driving
+			if (!isCharging && soc_getCurrent() > 0.5) {
+				// more than 0.5A discharge, must be driving
 				config->loopDelay = 2;
 				if (!isDriving) {
 					isDriving = TRUE;
@@ -382,7 +382,7 @@ int main(int argc, char *argv[]) {
 			time(&t);
 		}
 		double current = soc_getCurrent();
-		if (current > 1) {
+		if (current > 0.5) {
 			whenLastOver1A = t;
 		}
 		if (!isCharging && t - whenLastOver1A > 60) {
