@@ -43,6 +43,7 @@ static unsigned short maxShuntTemperature = 0;
 static time_t whenChargerOn = 0;
 static time_t whenLastValid;
 static time_t whenTurnedOff = 0;
+static time_t whenLastShunting = 0;
 static char chargerShutdown = 0;
 static char chargerState = 0;
 static chargerStateChangeReason_t chargerStateChangeReason = UNDEFINED;
@@ -154,6 +155,18 @@ static void doChargerControl() {
 			}
 		}
 	}
+
+	// decide whether to go to sleep
+	if (chargerShutdown) {
+		if (whenLastShunting == 0) {
+			// first time through this code, initialise
+			whenLastShunting = now;
+		}
+		if (now - whenLastShunting > 120) {
+			config->loopDelay = 300;
+		}
+	}
+
 	fprintf(stderr, "chargerState %d %d %s %d\n", chargerShutdown, chargerState,
 			chargeAlgorithm_getStateChangeReasonString(chargerStateChangeReason), shuntingDelay);
 	monitorCan_sendChargerState(chargerShutdown, chargerState, chargerStateChangeReason, shuntingDelay);
@@ -186,6 +199,15 @@ static void voltageListener(unsigned char batteryIndex, unsigned short cellIndex
 	}
 }
 
+static void minCurrentListener(unsigned char batteryIndex, unsigned short cellIndex,
+		unsigned short minCurrent) {
+	if (minCurrent > 0) {
+		// have to avoid compile error by accessing BatteryIndex and CellIndex, is there a bettery way?
+		fprintf(stderr, "minCurrent %d %d", batteryIndex, cellIndex);
+		time(&whenLastShunting);
+	}
+}
+
 static void temperatureListener(unsigned char batteryIndex, unsigned short cellIndex, unsigned short temperature) {
 	if (temperature > maxShuntTemperature) {
 		fprintf(stderr, "max temperature at %d %d: %d", batteryIndex, cellIndex, temperature);
@@ -200,6 +222,7 @@ void chargeAlgorithm_init(struct config_t *_config) {
 	} else {
 		canEventListener_registerVoltageListener(voltageListener);
 		canEventListener_registerTemperatureListener(temperatureListener);
+		canEventListener_registerMinCurrentListener(minCurrentListener);
 		time(&whenLastValid);
 	}
 }
